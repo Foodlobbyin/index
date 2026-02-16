@@ -1,0 +1,15 @@
+# Node.js
+node_modules/
+
+# npm
+package-lock.json
+
+# React
+build/
+
+# Environment variables
+.env
+
+# IDE settings
+.idea/
+.vscode/
