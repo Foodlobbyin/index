@@ -6,12 +6,14 @@ export default function RegisterPage(): JSX.Element {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<RegisterData>({
     username: '',
+    mobile_number: '',
     email: '',
     password: '',
     first_name: '',
     last_name: '',
   });
   const [error, setError] = useState<string>('');
+  const [success, setSuccess] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -24,15 +26,23 @@ export default function RegisterPage(): JSX.Element {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
 
     try {
       const response = await authService.register(formData);
       localStorage.setItem('token', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
-      navigate('/');
+      
+      if (response.message) {
+        setSuccess(response.message);
+        // Navigate after showing success message
+        setTimeout(() => navigate('/'), 2000);
+      } else {
+        navigate('/');
+      }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      setError(err.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -44,6 +54,7 @@ export default function RegisterPage(): JSX.Element {
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#ecf0f1',
+    padding: '20px',
   };
 
   const formContainerStyle: React.CSSProperties = {
@@ -85,6 +96,14 @@ export default function RegisterPage(): JSX.Element {
     marginBottom: '15px',
   };
 
+  const successStyle: React.CSSProperties = {
+    backgroundColor: '#27ae60',
+    color: 'white',
+    padding: '10px',
+    borderRadius: '4px',
+    marginBottom: '15px',
+  };
+
   return (
     <div style={containerStyle}>
       <div style={formContainerStyle}>
@@ -96,13 +115,24 @@ export default function RegisterPage(): JSX.Element {
         </h2>
 
         {error && <div style={errorStyle}>{error}</div>}
+        {success && <div style={successStyle}>{success}</div>}
 
         <form onSubmit={handleSubmit}>
           <input
             type="text"
             name="username"
-            placeholder="Username"
+            placeholder="Username *"
             value={formData.username}
+            onChange={handleChange}
+            required
+            style={inputStyle}
+            disabled={loading}
+          />
+          <input
+            type="tel"
+            name="mobile_number"
+            placeholder="Mobile Number * (e.g., +1234567890)"
+            value={formData.mobile_number}
             onChange={handleChange}
             required
             style={inputStyle}
@@ -111,7 +141,7 @@ export default function RegisterPage(): JSX.Element {
           <input
             type="email"
             name="email"
-            placeholder="Email"
+            placeholder="Email *"
             value={formData.email}
             onChange={handleChange}
             required
@@ -139,12 +169,12 @@ export default function RegisterPage(): JSX.Element {
           <input
             type="password"
             name="password"
-            placeholder="Password"
+            placeholder="Password (optional for OTP-only login)"
             value={formData.password}
             onChange={handleChange}
-            required
             style={inputStyle}
             disabled={loading}
+            minLength={6}
           />
           <button type="submit" style={buttonStyle} disabled={loading}>
             {loading ? 'Registering...' : 'Register'}
