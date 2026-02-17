@@ -1,8 +1,16 @@
 import pool from '../config/database';
 import { User, UserCreateInput, UserResponse } from '../models/User';
 
+export interface UserCreateData {
+  username: string;
+  email: string;
+  password_hash: string;
+  first_name?: string;
+  last_name?: string;
+}
+
 export class UserRepository {
-  async create(user: UserCreateInput & { password_hash: string }): Promise<UserResponse> {
+  async create(user: UserCreateData): Promise<UserResponse> {
     const { username, email, password_hash, first_name, last_name } = user;
     const result = await pool.query(
       `INSERT INTO users (username, email, password_hash, first_name, last_name) 
