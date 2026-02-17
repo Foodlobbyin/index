@@ -199,3 +199,154 @@ docker logs foodlobbyin_api
 rm -rf backend/dist frontend/dist
 npm run build
 ```
+
+## 🧪 Testing
+
+The project has comprehensive test coverage using Jest (backend) and Vitest (frontend).
+
+### Running Tests
+
+#### Run All Tests
+```bash
+# Run tests for both frontend and backend
+npm test
+```
+
+#### Backend Tests (Jest)
+```bash
+cd backend
+
+# Run tests once
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+```
+
+#### Frontend Tests (Vitest)
+```bash
+cd frontend
+
+# Run tests once
+npm test
+
+# Run tests with UI
+npm run test:ui
+
+# Run tests with coverage report
+npm run test:coverage
+```
+
+### Test Structure
+
+#### Backend Tests (`backend/src/__tests__/`)
+- **Unit Tests**: Test individual services, controllers, and repositories
+- **Integration Tests**: Test API endpoints with mocked database
+- **Test Configuration**: `jest.config.js`
+- **Setup File**: `src/setupTests.ts`
+
+Example test locations:
+- `__tests__/services/auth.service.test.ts` - Authentication service tests
+- `__tests__/services/company.service.test.ts` - Company service tests
+- `__tests__/controllers/` - Controller tests (to be added)
+- `__tests__/repositories/` - Repository tests (to be added)
+
+#### Frontend Tests (`frontend/src/__tests__/`)
+- **Component Tests**: Test React components in isolation
+- **Page Tests**: Test complete pages with routing
+- **Service Tests**: Test API service functions
+- **Test Configuration**: `vitest.config.ts`
+- **Setup File**: `src/setupTests.ts`
+
+Example test locations:
+- `__tests__/components/Navigation.test.tsx` - Navigation component tests
+- `__tests__/components/ProtectedRoute.test.tsx` - Protected route tests
+- `__tests__/pages/LoginPage.test.tsx` - Login page tests
+- `__tests__/services/authService.test.ts` - Auth service tests
+
+### Writing Tests
+
+#### Backend Test Example (Jest)
+```typescript
+import authService from '../../services/auth.service';
+import userRepository from '../../repositories/user.repository';
+
+jest.mock('../../repositories/user.repository');
+
+describe('AuthService', () => {
+  it('should register a new user', async () => {
+    const userData = {
+      username: 'testuser',
+      email: 'test@example.com',
+      password: 'password123',
+    };
+
+    (userRepository.findByUsername as jest.Mock).mockResolvedValue(null);
+    (userRepository.create as jest.Mock).mockResolvedValue({ id: 1, ...userData });
+
+    const result = await authService.register(userData);
+
+    expect(result).toHaveProperty('user');
+    expect(result).toHaveProperty('token');
+  });
+});
+```
+
+#### Frontend Test Example (Vitest + React Testing Library)
+```typescript
+import { render, screen, fireEvent } from '@testing-library/react';
+import { BrowserRouter } from 'react-router-dom';
+import LoginPage from '../../pages/LoginPage';
+
+describe('LoginPage', () => {
+  it('should render login form', () => {
+    render(
+      <BrowserRouter>
+        <LoginPage />
+      </BrowserRouter>
+    );
+
+    expect(screen.getByPlaceholderText(/username/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/password/i)).toBeInTheDocument();
+  });
+});
+```
+
+### Test Coverage
+
+Current test coverage goals:
+- **Backend**: 50% minimum (aiming for 70%+)
+- **Frontend**: 50% minimum (aiming for 70%+)
+
+View detailed coverage reports:
+- **Backend**: `backend/coverage/index.html`
+- **Frontend**: `frontend/coverage/index.html`
+
+### CI/CD Integration
+
+Tests are run automatically in CI/CD pipeline:
+```bash
+# Before committing, run tests locally
+npm test
+
+# Check test coverage
+npm run test:coverage --workspaces
+```
+
+### Troubleshooting Tests
+
+**Backend tests fail with database connection errors:**
+- Tests use mocked repositories and don't require a real database
+- Check that `setupTests.ts` has correct environment variables
+
+**Frontend tests fail with "Cannot find module" errors:**
+- Ensure all dependencies are installed: `npm install`
+- Clear the cache: `npm run test -- --clearCache`
+
+**Tests timeout:**
+- Increase timeout in test configuration
+- Backend: `jest.config.js` → `testTimeout: 10000`
+- Frontend: `vitest.config.ts` → `testTimeout: 10000`
