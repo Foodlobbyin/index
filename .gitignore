@@ -4,8 +4,9 @@ node_modules/
 # npm
 package-lock.json
 
-# React
+# React / Vite
 build/
+dist/
 
 # Environment variables
 .env

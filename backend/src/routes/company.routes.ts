@@ -1,14 +1,15 @@
 import { Router } from 'express';
 import companyController from '../controllers/company.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
+import { createLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
 // All routes require authentication
 router.use(authMiddleware);
 
-// POST /api/company - Create company profile
-router.post('/', (req, res) => companyController.createCompany(req, res));
+// POST /api/company - Create company profile (rate limited)
+router.post('/', createLimiter, (req, res) => companyController.createCompany(req, res));
 
 // GET /api/company - Get user's company profile
 router.get('/', (req, res) => companyController.getCompany(req, res));

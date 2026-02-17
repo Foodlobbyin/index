@@ -44,7 +44,7 @@ export class InvoiceRepository {
 
   async delete(id: number): Promise<boolean> {
     const result = await pool.query('DELETE FROM invoices WHERE id = $1', [id]);
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getMarketInsights(industry?: string): Promise<MarketInsights[]> {
