@@ -14,6 +14,7 @@ describe('AuthService', () => {
     it('should successfully register a new user', async () => {
       const userData = {
         username: 'testuser',
+        mobile_number: '+1234567890',
         email: 'test@example.com',
         password: 'password123',
         first_name: 'Test',
@@ -23,14 +24,17 @@ describe('AuthService', () => {
       const mockUser = {
         id: 1,
         username: 'testuser',
+        mobile_number: '+1234567890',
         email: 'test@example.com',
         first_name: 'Test',
         last_name: 'User',
+        email_verified: false,
         created_at: new Date(),
       };
 
       (userRepository.findByUsername as jest.Mock).mockResolvedValue(null);
       (userRepository.findByEmail as jest.Mock).mockResolvedValue(null);
+      (userRepository.findByMobileNumber as jest.Mock).mockResolvedValue(null);
       (userRepository.create as jest.Mock).mockResolvedValue(mockUser);
 
       const result = await authService.register(userData);
@@ -47,6 +51,7 @@ describe('AuthService', () => {
     it('should throw error if username already exists', async () => {
       const userData = {
         username: 'existinguser',
+        mobile_number: '+1234567890',
         email: 'test@example.com',
         password: 'password123',
       };
@@ -62,6 +67,7 @@ describe('AuthService', () => {
     it('should throw error if email already exists', async () => {
       const userData = {
         username: 'newuser',
+        mobile_number: '+1234567890',
         email: 'existing@example.com',
         password: 'password123',
       };
