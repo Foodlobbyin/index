@@ -1,16 +1,16 @@
 import { Router } from 'express';
-import AuthController from '../controllers/AuthController';
-import { authMiddleware } from '../middleware/auth';
+import authController from '../controllers/auth.controller';
+import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// POST /register
-router.post('/register', AuthController.register);
+// POST /api/auth/register
+router.post('/register', (req, res) => authController.register(req, res));
 
-// POST /login
-router.post('/login', AuthController.login);
+// POST /api/auth/login
+router.post('/login', (req, res) => authController.login(req, res));
 
-// GET /profile
-router.get('/profile', authMiddleware, AuthController.getProfile);
+// GET /api/auth/profile - Protected route
+router.get('/profile', authMiddleware, (req, res) => authController.getProfile(req, res));
 
 export default router;
