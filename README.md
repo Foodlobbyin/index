@@ -41,6 +41,7 @@ This will:
 After starting the stack, access these services:
 
 - **Backend API**: http://localhost:5000/api
+- **API Documentation (Swagger)**: http://localhost:5000/api-docs
 - **API Health Check**: http://localhost:5000/api/health
 - **pgAdmin**: http://localhost:5050
   - Email: admin@example.com
@@ -49,6 +50,59 @@ After starting the stack, access these services:
   - User: postgres
   - Password: password
   - Database: foodlobbyin
+
+## 📚 API Documentation (Swagger/OpenAPI)
+
+Foodlobbyin includes comprehensive interactive API documentation powered by Swagger UI:
+
+**Access Swagger UI**: http://localhost:5000/api-docs
+
+### Features
+
+- 🔍 **Interactive API Explorer** - Browse and test all 30+ API endpoints
+- 🔐 **JWT Authentication** - Built-in token management with "Authorize" button
+- 📝 **Request/Response Examples** - Complete with validation rules
+- 🎯 **Try It Out** - Test APIs directly from your browser
+- 📊 **Schema Definitions** - Detailed models for all data structures
+- 🏷️ **Organized by Tags** - Authentication, Company, Invoices, Insights, Referrals
+
+### Available Endpoints
+
+- **Authentication** (8 endpoints) - Registration, login, email verification, password reset, OTP
+- **Secure Auth** (5 endpoints) - Enhanced registration with referral codes and GSTN validation
+- **Referrals** (6 endpoints) - Create and manage referral codes
+- **Company** (4 endpoints) - CRUD operations for company profiles
+- **Invoices** (5 endpoints) - Invoice management and tracking
+- **Insights** (1 endpoint) - Aggregated market analytics
+- **Health** (1 endpoint) - API health check
+
+### How to Use Swagger UI
+
+1. **Browse Endpoints**: Expand any section to see available endpoints
+2. **Authenticate**:
+   - Register or login to get a JWT token
+   - Click the 🔒 "Authorize" button at top right
+   - Enter: `Bearer YOUR_JWT_TOKEN`
+   - Click "Authorize"
+3. **Test Endpoints**:
+   - Click on any endpoint to expand
+   - Click "Try it out"
+   - Fill in required parameters/body
+   - Click "Execute"
+   - View response with status code and data
+
+### Export OpenAPI Specification
+
+Get the raw OpenAPI 3.0 JSON specification:
+```bash
+curl http://localhost:5000/api-docs.json > api-spec.json
+```
+
+Use this spec to:
+- Generate API clients (TypeScript, Python, Java, etc.)
+- Import into Postman or Insomnia
+- Generate documentation in other formats
+- Set up API testing frameworks
 
 ## 🔐 Authentication Features
 
