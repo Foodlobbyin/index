@@ -8,6 +8,7 @@ import companyRoutes from './routes/company.routes';
 import invoiceRoutes from './routes/invoice.routes';
 import insightsRoutes from './routes/insights.routes';
 import { apiLimiter } from './middleware/rateLimiter';
+import { setupSwagger } from './config/swagger';
 
 // Load environment variables
 dotenv.config();
@@ -20,10 +21,50 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Setup Swagger documentation
+setupSwagger(app);
+
 // Apply general rate limiting to all API routes
 app.use('/api', apiLimiter);
 
 // Health check
+/**
+ * @openapi
+ * /api/health:
+ *   get:
+ *     tags:
+ *       - Health
+ *     summary: API health check
+ *     description: Returns the health status of the API and enabled features
+ *     responses:
+ *       200:
+ *         description: API is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: OK
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 service:
+ *                   type: string
+ *                   example: Foodlobbyin API
+ *                 features:
+ *                   type: object
+ *                   properties:
+ *                     secureRegistration:
+ *                       type: boolean
+ *                     referralSystem:
+ *                       type: boolean
+ *                     otpVerification:
+ *                       type: boolean
+ *                     gstnValidation:
+ *                       type: boolean
+ */
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
@@ -61,6 +102,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📍 API: http://localhost:${PORT}/api`);
+  console.log(`📚 API Docs: http://localhost:${PORT}/api-docs`);
   console.log(`💚 Health: http://localhost:${PORT}/api/health`);
   console.log(`🔒 Secure Auth: http://localhost:${PORT}/api/secure-auth`);
   console.log(`🎫 Referrals: http://localhost:${PORT}/api/referrals`);
