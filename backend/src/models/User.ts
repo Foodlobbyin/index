@@ -36,6 +36,16 @@ export interface UserCreateInput {
   referral_code: string;
 }
 
+// Legacy interface for backward compatibility with old auth endpoints
+export interface UserCreateInputLegacy {
+  username: string;
+  mobile_number?: string;
+  email: string;
+  password?: string;
+  first_name?: string;
+  last_name?: string;
+}
+
 export interface UserLoginInput {
   username: string;
   password: string;

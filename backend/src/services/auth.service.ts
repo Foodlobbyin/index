@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import userRepository from '../repositories/user.repository';
 import emailService from './email.service';
-import { UserCreateInput, UserLoginInput, EmailOTPLoginInput, UserResponse } from '../models/User';
+import { UserCreateInputLegacy, UserLoginInput, EmailOTPLoginInput, UserResponse } from '../models/User';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const SALT_ROUNDS = 10;
@@ -19,7 +19,7 @@ export class AuthService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  async register(userData: UserCreateInput): Promise<{ user: UserResponse; token: string; message: string }> {
+  async register(userData: UserCreateInputLegacy): Promise<{ user: UserResponse; token: string; message: string }> {
     // Check if user already exists
     const existingUser = await userRepository.findByUsername(userData.username);
     if (existingUser) {
@@ -31,9 +31,11 @@ export class AuthService {
       throw new Error('Email already exists');
     }
 
-    const existingMobile = await userRepository.findByMobileNumber(userData.mobile_number);
-    if (existingMobile) {
-      throw new Error('Mobile number already exists');
+    if (userData.mobile_number) {
+      const existingMobile = await userRepository.findByMobileNumber(userData.mobile_number);
+      if (existingMobile) {
+        throw new Error('Mobile number already exists');
+      }
     }
 
     // Generate email verification token
