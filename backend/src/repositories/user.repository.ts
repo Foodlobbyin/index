@@ -3,23 +3,36 @@ import { User, UserCreateInput, UserResponse } from '../models/User';
 
 export interface UserCreateData {
   username: string;
-  mobile_number: string;
+  mobile_number?: string;
+  phone_number?: string;
   email: string;
   password_hash?: string;
   first_name?: string;
   last_name?: string;
+  gstn?: string;
   email_verification_token?: string;
   email_verification_expires?: Date;
 }
 
 export class UserRepository {
   async create(user: UserCreateData): Promise<UserResponse> {
-    const { username, mobile_number, email, password_hash, first_name, last_name, email_verification_token, email_verification_expires } = user;
+    const { username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires } = user;
     const result = await pool.query(
-      `INSERT INTO users (username, mobile_number, email, password_hash, first_name, last_name, email_verification_token, email_verification_expires) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-       RETURNING id, username, mobile_number, email, first_name, last_name, email_verified, created_at`,
-      [username, mobile_number, email, password_hash, first_name, last_name, email_verification_token, email_verification_expires]
+      `INSERT INTO users (username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires, account_activated) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, FALSE) 
+       RETURNING id, username, mobile_number, phone_number, email, first_name, last_name, gstn, email_verified, account_activated, created_at`,
+      [username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires]
+    );
+    return result.rows[0];
+  }
+
+  async createWithClient(user: UserCreateData, client: any): Promise<UserResponse> {
+    const { username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires } = user;
+    const result = await client.query(
+      `INSERT INTO users (username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires, account_activated) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, FALSE) 
+       RETURNING id, username, mobile_number, phone_number, email, first_name, last_name, gstn, email_verified, account_activated, created_at`,
+      [username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires]
     );
     return result.rows[0];
   }
@@ -102,6 +115,23 @@ export class UserRepository {
   async clearEmailOTP(userId: number): Promise<void> {
     await pool.query(
       'UPDATE users SET email_otp = NULL, email_otp_expires = NULL WHERE id = $1',
+      [userId]
+    );
+  }
+
+  async findByPhoneNumber(phoneNumber: string): Promise<User | null> {
+    const result = await pool.query('SELECT * FROM users WHERE phone_number = $1', [phoneNumber]);
+    return result.rows[0] || null;
+  }
+
+  async findByGSTN(gstn: string): Promise<User | null> {
+    const result = await pool.query('SELECT * FROM users WHERE gstn = $1', [gstn]);
+    return result.rows[0] || null;
+  }
+
+  async activateAccount(userId: number): Promise<void> {
+    await pool.query(
+      'UPDATE users SET account_activated = TRUE, email_verified = TRUE WHERE id = $1',
       [userId]
     );
   }
