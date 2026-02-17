@@ -50,6 +50,40 @@ After starting the stack, access these services:
   - Password: password
   - Database: foodlobbyin
 
+## 🔐 Authentication Features
+
+Foodlobbyin includes comprehensive authentication features:
+
+- ✅ **Email Verification** - Automatic verification emails sent on registration
+- ✅ **Password Reset** - Secure email-based password recovery
+- ✅ **Email OTP Login** - Alternative authentication using One-Time Passwords
+- ✅ **Mobile Number ID** - Mobile number as unique user identifier
+
+### Quick Authentication Guide
+
+**Registration**: Users provide username, mobile number, email, and optional password.
+
+**Login Options**:
+1. **Password Login**: Traditional username + password
+2. **Email OTP Login**: Email + 6-digit OTP (perfect for forgotten passwords)
+
+**Password Recovery**: Click "Forgot Password?" → Enter email → Follow reset link
+
+📖 **Complete Guide**: See [AUTHENTICATION.md](./AUTHENTICATION.md) for detailed documentation.
+
+### Email Configuration
+
+To enable email features, configure these environment variables:
+
+```bash
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your-app-password
+EMAIL_FROM=noreply@foodlobbyin.com
+FRONTEND_URL=http://localhost:3000
+```
+
 ## 📋 Available Scripts
 
 ### Root (Monorepo) Scripts
