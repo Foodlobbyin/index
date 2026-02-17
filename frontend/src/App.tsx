@@ -1,80 +1,62 @@
-import React, { useState } from 'react';
-
-interface UserState {
-  isLoggedIn: boolean;
-  username: string;
-}
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import Dashboard from './pages/Dashboard';
+import CompanyProfile from './pages/CompanyProfile';
+import InvoiceList from './pages/InvoiceList';
+import InsightsPage from './pages/InsightsPage';
+import ProtectedRoute from './components/ProtectedRoute';
+import { authService } from './services/authService';
 
 export default function App(): JSX.Element {
-  const [user, setUser] = useState<UserState>({
-    isLoggedIn: false,
-    username: '',
-  });
-
-  const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const username = formData.get('username') as string;
-    setUser({ isLoggedIn: true, username });
-  };
-
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <header>
-        <h1>Foodlobbyin - B2B Market Insights Platform</h1>
-      </header>
-
-      {!user.isLoggedIn ? (
-        <div style={{ maxWidth: '400px', margin: '50px auto' }}>
-          <h2>Login</h2>
-          <form onSubmit={handleLogin}>
-            <input
-              type="text"
-              name="username"
-              placeholder="Username"
-              required
-              style={{ width: '100%', padding: '8px', marginBottom: '10px' }}
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              required
-              style={{ width: '100%', padding: '8px', marginBottom: '10px' }}
-            />
-            <button
-              type="submit"
-              style={{
-                width: '100%',
-                padding: '10px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              Login
-            </button>
-          </form>
-        </div>
-      ) : (
-        <div>
-          <h2>Welcome, {user.username}!</h2>
-          <div style={{ marginTop: '20px' }}>
-            <h3>Dashboard</h3>
-            <ul>
-              <li><a href="#company">Company Profile</a></li>
-              <li><a href="#invoices">Manage Invoices</a></li>
-              <li><a href="#insights">Market Insights</a></li>
-            </ul>
-          </div>
-          <button
-            onClick={() => setUser({ isLoggedIn: false, username: '' })}
-            style={{ marginTop: '20px', padding: '10px', cursor: 'pointer' }}
-          >
-            Logout
-          </button>
-        </div>
-      )}
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/company"
+          element={
+            <ProtectedRoute>
+              <CompanyProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/invoices"
+          element={
+            <ProtectedRoute>
+              <InvoiceList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/insights"
+          element={
+            <ProtectedRoute>
+              <InsightsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="*"
+          element={
+            authService.isAuthenticated() ? (
+              <Navigate to="/" replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+      </Routes>
+    </Router>
   );
 }
