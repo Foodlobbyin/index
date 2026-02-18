@@ -390,7 +390,7 @@ export const setupSwagger = (app: Express): void => {
   // Swagger UI
   app.use(
     '/api-docs',
-    swaggerUi.serve,
+    ...swaggerUi.serve,
     swaggerUi.setup(swaggerSpec, {
       customCss: '.swagger-ui .topbar { display: none }',
       customSiteTitle: 'Foodlobbyin API Documentation',
