@@ -85,7 +85,7 @@ router.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/', createLimiter, (req, res) => invoiceController.createInvoice(req, res));
+router.post('/', /* createLimiter */ (req, res) => invoiceController.createInvoice(req, res));
 
 /**
  * @openapi
