@@ -76,7 +76,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/register', authLimiter, (req, res) => authController.register(req, res));
+router.post('/register', /* authLimiter */ (req, res) => authController.register(req, res));
 
 /**
  * @openapi
@@ -130,7 +130,7 @@ router.post('/register', authLimiter, (req, res) => authController.register(req,
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/login', authLimiter, (req, res) => authController.login(req, res));
+router.post('/login', /* authLimiter */ (req, res) => authController.login(req, res));
 
 /**
  * @openapi
@@ -207,7 +207,7 @@ router.get('/verify-email', (req, res) => authController.verifyEmail(req, res));
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/request-password-reset', authLimiter, (req, res) => authController.requestPasswordReset(req, res));
+router.post('/request-password-reset', /* authLimiter */ (req, res) => authController.requestPasswordReset(req, res));
 
 /**
  * @openapi
@@ -252,7 +252,7 @@ router.post('/request-password-reset', authLimiter, (req, res) => authController
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/reset-password', authLimiter, (req, res) => authController.resetPassword(req, res));
+router.post('/reset-password', /* authLimiter */ (req, res) => authController.resetPassword(req, res));
 
 /**
  * @openapi
@@ -293,7 +293,7 @@ router.post('/reset-password', authLimiter, (req, res) => authController.resetPa
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/request-email-otp', authLimiter, (req, res) => authController.requestEmailOTP(req, res));
+router.post('/request-email-otp', /* authLimiter */ (req, res) => authController.requestEmailOTP(req, res));
 
 /**
  * @openapi
@@ -340,7 +340,7 @@ router.post('/request-email-otp', authLimiter, (req, res) => authController.requ
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/login-with-otp', authLimiter, (req, res) => authController.loginWithEmailOTP(req, res));
+router.post('/login-with-otp', /* authLimiter */ (req, res) => authController.loginWithEmailOTP(req, res));
 
 /**
  * @openapi
