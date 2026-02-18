@@ -4,8 +4,9 @@ node_modules/
 # npm
 package-lock.json
 
-# React
+# React / Vite
 build/
+dist/
 
 # Environment variables
 .env
@@ -13,3 +14,8 @@ build/
 # IDE settings
 .idea/
 .vscode/
+
+# Test coverage
+coverage/
+*.lcov
+.nyc_output/

@@ -1,1 +1,28 @@
-{\n  "workspaces": {\n    "packages": [\n      "frontend/*",\n      "backend/*",\n      "shared/*"\n    ]\n  },\n  "devDependencies": {\n    "eslint": "^8.0.0",\n    "prettier": "^2.0.0",\n    "typescript": "^4.0.0"\n  },\n  "scripts": {\n    "dev": "concurrently 'npm run dev --workspace frontend' 'npm run dev --workspace backend' ",\n    "build": "npm run build --workspace frontend && npm run build --workspace backend",\n    "start": "npm run start --workspace frontend"\n  }\n}
+{
+  "name": "foodlobbyin-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "eslint": "^8.0.0",
+    "prettier": "^2.0.0",
+    "typescript": "^4.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=frontend\" \"npm run dev --workspace=backend\"",
+    "dev:stack": "cd infrastructure && docker-compose up",
+    "dev:stack:build": "cd infrastructure && docker-compose up --build",
+    "dev:stack:down": "cd infrastructure && docker-compose down",
+    "build": "npm run build --workspace=frontend && npm run build --workspace=backend",
+    "start": "npm run start --workspace=backend",
+    "start:frontend": "npm run preview --workspace=frontend",
+    "test": "npm run test --workspaces --if-present",
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
+  }
+}
