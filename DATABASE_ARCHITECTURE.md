@@ -1,31 +1,80 @@
 # Database Architecture Documentation for the Incidents System
 
 ## Overview
-The Incidents System is designed to manage and track incidents in a structured manner. The following documentation outlines the key components of the database architecture including tables, relationships, and data flow.
+This document outlines the complete database architecture for the incidents system, describing all essential components, including tables, relationships, and features, along with diagrams and testing protocols.
 
-## Key Entities
-1. **Incidents**: Stores all incident records.
-   - **Fields**: `incident_id`, `title`, `description`, `status`, `created_at`, `updated_at`
+---
 
-2. **Users**: Contains information about users who report incidents.
-   - **Fields**: `user_id`, `name`, `email`, `role`, `created_at`
+## Tables
+### 1. Incidents
+- **Table Name**: incidents  
+- **Columns**:  
+  - `id`: Unique identifier for each incident  
+  - `title`: Brief description of the incident  
+  - `description`: Detailed description of the incident  
+  - `status`: Current status of the incident (open, resolved, etc.)  
+  - `created_at`: Timestamp for when the incident was reported  
+  - `updated_at`: Timestamp for when the incident was last updated  
 
-3. **Categories**: Classifies incidents into various categories.
-   - **Fields**: `category_id`, `category_name`, `created_at`
+### 2. Incident Evidence
+- **Table Name**: incident_evidence  
+- **Columns**:  
+  - `id`: Unique identifier for evidence  
+  - `incident_id`: Foreign key linking to incidents  
+  - `evidence_type`: Type of evidence (image, document, etc.)  
+  - `evidence_description`: Description of the evidence  
+  - `created_at`: Timestamp for when evidence was added  
 
-4. **Comments**: Allows users to add comments to incidents for better context and communication.
-   - **Fields**: `comment_id`, `incident_id`, `user_id`, `comment`, `created_at`
+### 3. Incident Responses
+- **Table Name**: incident_responses  
+- **Columns**:  
+  - `id`: Unique identifier for each response  
+  - `incident_id`: Foreign key linking to incidents  
+  - `response_text`: Text of the response  
+  - `responded_at`: Timestamp for when the response was made  
 
-## Relationships
-- **Incidents to Users**: Each incident is reported by a user. (One-to-Many)
-- **Incidents to Categories**: Each incident can belong to one category. (Many-to-One)
-- **Incidents to Comments**: Each incident can have multiple comments. (One-to-Many)
+### 4. Incident Moderation Log
+- **Table Name**: incident_moderation_log  
+- **Columns**:  
+  - `id`: Unique identifier for each moderation entry  
+  - `incident_id`: Foreign key linking to incidents  
+  - `moderator_action`: Action taken by the moderator  
+  - `moderated_at`: Timestamp for when moderation occurred  
 
-## Data Flow
-1. When a user reports an incident, a new record is created in the `Incidents` table.
-2. The user's details are fetched from the `Users` table based on their login.
-3. The incident can be categorized by selecting a category from the `Categories` table.
-4. Other users can add comments to the incident, creating multiple entries in the `Comments` table linked to the `incident_id`.
+### 5. Contact Persons
+- **Table Name**: contact_persons  
+- **Columns**:  
+  - `id`: Unique identifier for contact person  
+  - `incident_id`: Foreign key linking to incidents  
+  - `name`: Name of the contact person  
+  - `email`: Email address for follow-ups  
+  - `phone`: Phone number of the contact person  
 
-## Conclusion
-This database architecture supports a robust incidents management system, ensuring efficient data handling and integrity through its structured relationships and entities.
+---
+
+## Entity-Relationship Diagram (ERD)
+[Insert ERD here]
+
+---
+
+## Privacy Features
+- Data Encryption: All sensitive data is encrypted at rest and in transit.
+- Access Control: Role-based access control ensures that only authorized personnel can access sensitive information.
+- Data Anonymization: Personally identifiable information is anonymized where applicable.
+
+---
+
+## Workflow Diagrams
+[Insert workflow diagrams here]
+
+---
+
+## Testing Checklist
+1. Validate database schema against the requirements.
+2. Test data integrity and relationships between tables.
+3. Verify access controls and data privacy measures.
+4. Test for performance under load.
+
+---
+
+This documentation aims to serve as a comprehensive guide to understanding and utilizing the database architecture for the incidents system. Please ensure that any updates to the system are reflected in this documentation.
