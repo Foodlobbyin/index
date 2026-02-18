@@ -109,7 +109,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/register', authRateLimiter, secureAuthController.register);
+router.post('/register', /* authRateLimiter */ secureAuthController.register);
 
 /**
  * @openapi
@@ -168,7 +168,7 @@ router.post('/register', authRateLimiter, secureAuthController.register);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/verify-otp', otpRateLimiter, secureAuthController.verifyOTP);
+router.post('/verify-otp', /* otpRateLimiter */ secureAuthController.verifyOTP);
 
 /**
  * @openapi
@@ -209,7 +209,7 @@ router.post('/verify-otp', otpRateLimiter, secureAuthController.verifyOTP);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/request-otp', otpRateLimiter, secureAuthController.requestOTP);
+router.post('/request-otp', /* otpRateLimiter */ secureAuthController.requestOTP);
 
 /**
  * @openapi
@@ -262,7 +262,7 @@ router.post('/request-otp', otpRateLimiter, secureAuthController.requestOTP);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/login', authRateLimiter, secureAuthController.login);
+router.post('/login', /* authRateLimiter */ secureAuthController.login);
 
 /**
  * @openapi
