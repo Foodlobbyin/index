@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "dist/index.js",
   "scripts": {
-    "predev": "node -e \"const fs = require('fs'); const path = require('path'); const checkPaths = ['node_modules', path.join('..', 'node_modules')]; const hasNodeModules = checkPaths.some(p => fs.existsSync(p)); if (!hasNodeModules) { console.error('\\n❌ ERROR: Dependencies not installed!\\n\\nPlease run from project root: npm install\\n'); process.exit(1); }\"",
+    "predev": "node ../scripts/check-dependencies.js",
     "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
