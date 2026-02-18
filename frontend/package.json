@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node -e \"const fs = require('fs'); const path = require('path'); const checkPaths = ['node_modules', path.join('..', 'node_modules')]; const hasNodeModules = checkPaths.some(p => fs.existsSync(p)); if (!hasNodeModules) { console.error('\\n❌ ERROR: Dependencies not installed!\\n\\nPlease run from project root: npm install\\n'); process.exit(1); }\"",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
