@@ -12,6 +12,51 @@ Before starting, make sure you have:
 
 ---
 
+## Quick Start Options
+
+You have two options to get started:
+
+### Option A: Automated Start (Recommended for Beginners)
+
+Use the automated start script that handles everything for you:
+
+**On Windows:**
+```bash
+# Navigate to project directory
+cd path\to\your\project
+
+# Run the start script
+start.bat
+```
+
+**On Mac/Linux:**
+```bash
+# Navigate to project directory
+cd path/to/your/project
+
+# Make script executable (first time only)
+chmod +x start.sh
+
+# Run the start script
+./start.sh
+```
+
+The script will:
+1. ✅ Check prerequisites (Docker, Node.js)
+2. ✅ Install all dependencies automatically
+3. ✅ Start Docker containers
+4. ✅ Initialize database
+5. ✅ Start backend and frontend servers
+6. ✅ Open your browser to http://localhost:3000
+
+If any step fails, the script will show you a clear error message and stop.
+
+### Option B: Manual Setup (For Advanced Users)
+
+If you prefer to set up everything manually, follow the detailed steps below.
+
+---
+
 ## Step 1: Open Terminal/Command Prompt
 
 ### On Windows:
@@ -250,6 +295,45 @@ kill -9 <PID>
 1. Delete `node_modules` folders
 2. Delete `package-lock.json` files
 3. Run `npm install` again
+
+**Common causes and solutions**:
+
+**Network Issues:**
+- Check your internet connection
+- If behind a proxy, configure npm:
+  ```bash
+  npm config set proxy http://proxy.company.com:8080
+  npm config set https-proxy http://proxy.company.com:8080
+  ```
+- Try using a different network or VPN
+
+**npm Cache Corruption:**
+- Clear npm cache:
+  ```bash
+  npm cache clean --force
+  npm cache verify
+  ```
+- Then try installing again
+
+**Permission Issues:**
+- On Windows: Run Command Prompt as Administrator
+- On Mac/Linux: Fix permissions (avoid using sudo with npm):
+  ```bash
+  # Fix npm permissions
+  sudo chown -R $USER:$GROUP ~/.npm
+  sudo chown -R $USER:$GROUP ~/.config
+  ```
+
+**Verify npm and Node.js versions:**
+```bash
+node --version  # Should be v16 or higher
+npm --version   # Should be v8 or higher
+```
+
+**Try verbose installation to see detailed errors:**
+```bash
+npm install --verbose
+```
 
 ### Issue: Frontend won't start
 

@@ -31,20 +31,52 @@ echo [3/7] Installing dependencies...
 if not exist "node_modules" (
     echo Installing root dependencies...
     call npm install
+    if errorlevel 1 (
+        echo ERROR: Root npm install failed. Check your network connection and npm configuration.
+        echo Try running: npm install --verbose
+        pause
+        exit /b 1
+    )
+    echo ✓ Root dependencies installed
+) else (
+    echo ✓ Root dependencies already installed
 )
+
 if not exist "backend\node_modules" (
     echo Installing backend dependencies...
     cd backend
     call npm install
+    if errorlevel 1 (
+        echo ERROR: Backend npm install failed. Check your network connection and npm configuration.
+        echo Try running: cd backend ^&^& npm install --verbose
+        cd ..
+        pause
+        exit /b 1
+    )
     cd ..
+    echo ✓ Backend dependencies installed
+) else (
+    echo ✓ Backend dependencies already installed
 )
+
 if not exist "frontend\node_modules" (
     echo Installing frontend dependencies...
     cd frontend
     call npm install
+    if errorlevel 1 (
+        echo ERROR: Frontend npm install failed. Check your network connection and npm configuration.
+        echo Try running: cd frontend ^&^& npm install --verbose
+        cd ..
+        pause
+        exit /b 1
+    )
     cd ..
+    echo ✓ Frontend dependencies installed
+) else (
+    echo ✓ Frontend dependencies already installed
 )
-echo ✓ Dependencies installed
+
+echo ✓ All dependencies verified and installed
 
 REM Start Docker containers
 echo.
