@@ -63,8 +63,6 @@ npm install
 
 This single command will install dependencies for the entire monorepo. You don't need to run `npm install` in the backend or frontend directories separately.
 
-If you see errors like `'nodemon' is not recognized` or `'vite' is not recognized`, it means dependencies are not installed. Run `npm install` from the project root to fix this.
-
 #### Start Services
 
 ```bash
@@ -311,6 +309,22 @@ Sample users (password: password123):
 - pgAdmin 4
 
 ## 🐛 Troubleshooting
+
+### 'nodemon' is not recognized or 'vite' is not recognized
+
+**Error**: `'nodemon' is not recognized as an internal or external command` or `'vite' is not recognized`
+
+**Cause**: Dependencies are not installed.
+
+**Solution**:
+```bash
+# From the project root directory
+npm install
+```
+
+This will install all dependencies for the monorepo (root, backend, and frontend). After installation, you can run the dev commands again.
+
+**Note**: This project uses npm workspaces. All dependencies are managed from the root directory.
 
 ### Docker containers won't start
 
