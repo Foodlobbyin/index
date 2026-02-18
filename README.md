@@ -19,22 +19,73 @@ foodlobbyin/
 
 ### Prerequisites
 
-- **Node.js** (v18 or higher)
+- **Node.js** (v16 or higher)
 - **Docker** and **Docker Compose**
 - **npm** (comes with Node.js)
 
-### One-Command Setup
+### Option 1: Automated Start (Recommended)
 
-Run the entire stack with a single command:
+The easiest way to get started is using the automated start script:
 
+**On Windows:**
 ```bash
-npm run dev:stack:build
+start.bat
 ```
 
-This will:
-- Start PostgreSQL database
-- Start the backend API server
-- Start pgAdmin (database management UI)
+**On Mac/Linux:**
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+The script will automatically:
+1. ✅ Check prerequisites (Docker, Node.js)
+2. ✅ Install all dependencies
+3. ✅ Start Docker containers
+4. ✅ Initialize the database
+5. ✅ Start backend and frontend servers
+6. ✅ Open your browser to http://localhost:3000
+
+If any step fails, you'll see a clear error message with troubleshooting instructions.
+
+### Option 2: Manual Setup
+
+For more control, you can set up each component manually:
+
+#### Install Dependencies
+
+```bash
+# Install root workspace dependencies
+npm install
+
+# Install backend dependencies
+cd backend
+npm install
+cd ..
+
+# Install frontend dependencies
+cd frontend
+npm install
+cd ..
+```
+
+#### Start Services
+
+```bash
+# Terminal 1: Start Docker infrastructure
+cd infrastructure
+docker-compose up -d
+
+# Terminal 2: Start backend
+cd backend
+npm run dev
+
+# Terminal 3: Start frontend
+cd frontend
+npm run dev
+```
+
+For detailed manual setup instructions, see [QUICK_START_GUIDE.md](./QUICK_START_GUIDE.md).
 
 ### Services URLs
 

@@ -32,16 +32,49 @@ echo "[3/7] Installing dependencies..."
 if [ ! -d "node_modules" ]; then
     echo "Installing root dependencies..."
     npm install
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Root npm install failed. Check your network connection and npm configuration."
+        echo "Try running: npm install --verbose"
+        exit 1
+    fi
+    echo "✓ Root dependencies installed"
+else
+    echo "✓ Root dependencies already installed"
 fi
+
 if [ ! -d "backend/node_modules" ]; then
     echo "Installing backend dependencies..."
-    cd backend && npm install && cd ..
+    cd backend
+    npm install
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Backend npm install failed. Check your network connection and npm configuration."
+        echo "Try running: cd backend && npm install --verbose"
+        cd ..
+        exit 1
+    fi
+    cd ..
+    echo "✓ Backend dependencies installed"
+else
+    echo "✓ Backend dependencies already installed"
 fi
+
 if [ ! -d "frontend/node_modules" ]; then
     echo "Installing frontend dependencies..."
-    cd frontend && npm install && cd ..
+    cd frontend
+    npm install
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Frontend npm install failed. Check your network connection and npm configuration."
+        echo "Try running: cd frontend && npm install --verbose"
+        cd ..
+        exit 1
+    fi
+    cd ..
+    echo "✓ Frontend dependencies installed"
+else
+    echo "✓ Frontend dependencies already installed"
 fi
-echo "✓ Dependencies installed"
+
+echo "✓ All dependencies verified and installed"
 
 # Start Docker containers
 echo ""
