@@ -76,24 +76,18 @@ cd path/to/your/foodlobbyin/project
 
 ## Step 2: Install Dependencies
 
-Run these commands one by one:
+**Important:** This project uses npm workspaces, so you only need to run one command:
 
 ```bash
-# Install root dependencies
+# Install all dependencies (root, backend, and frontend)
 npm install
-
-# Install backend dependencies
-cd backend
-npm install
-cd ..
-
-# Install frontend dependencies
-cd frontend
-npm install
-cd ..
 ```
 
-**Wait for all installations to complete** (this might take 2-5 minutes).
+This single command installs dependencies for the entire monorepo (root, backend, and frontend). You don't need to `cd` into backend or frontend directories.
+
+**Wait for installation to complete** (this might take 2-5 minutes).
+
+**Common Error:** If you see `'nodemon' is not recognized` or `'vite' is not recognized`, it means dependencies are not installed. Run `npm install` from the project root to fix this.
 
 ---
 
@@ -197,9 +191,16 @@ docker exec -i foodlobbyin-db psql -U postgres -d foodlobbyin < ../infrastructur
 Open a **NEW terminal window** (keep Docker running in the other one).
 
 ```bash
+# From project root (not from backend directory)
+npm run dev --workspace=backend
+```
+
+**Alternative:** You can also run from backend directory:
+```bash
 cd backend
 npm run dev
 ```
+But the workspace command from root is recommended.
 
 You should see:
 ```
@@ -217,9 +218,16 @@ You should see:
 Open **ANOTHER NEW terminal window**.
 
 ```bash
+# From project root (not from frontend directory)
+npm run dev --workspace=frontend
+```
+
+**Alternative:** You can also run from frontend directory:
+```bash
 cd frontend
 npm run dev
 ```
+But the workspace command from root is recommended.
 
 You should see:
 ```
@@ -266,6 +274,22 @@ VITE v4.x.x  ready in xxx ms
 ---
 
 ## 🛠️ Troubleshooting
+
+### Issue: 'nodemon' is not recognized or 'vite' is not recognized
+
+**Error**: `'nodemon' is not recognized as an internal or external command`
+
+**Cause**: Dependencies are not installed.
+
+**Solution**:
+```bash
+# From the project root directory
+npm install
+```
+
+This will install all dependencies for the monorepo (root, backend, and frontend). After installation, you can run the dev commands again.
+
+**Note**: This project uses npm workspaces. All dependencies are managed from the root directory. You don't need to install dependencies in backend or frontend directories separately.
 
 ### Issue: Port already in use
 
@@ -348,17 +372,16 @@ npm install --verbose
 
 ### Starting Work:
 ```bash
-# Terminal 1: Start Docker
+# Terminal 1: Start Docker (from infrastructure directory)
 cd infrastructure
 docker-compose up -d
+cd ..
 
-# Terminal 2: Start Backend
-cd backend
-npm run dev
+# Terminal 2: Start Backend (from project root)
+npm run dev --workspace=backend
 
-# Terminal 3: Start Frontend
-cd frontend
-npm run dev
+# Terminal 3: Start Frontend (from project root)
+npm run dev --workspace=frontend
 ```
 
 ### Stopping Work:

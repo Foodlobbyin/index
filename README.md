@@ -54,20 +54,14 @@ For more control, you can set up each component manually:
 
 #### Install Dependencies
 
+**Important:** This project uses npm workspaces. You only need to install dependencies from the project root:
+
 ```bash
-# Install root workspace dependencies
+# Install all dependencies (root, backend, and frontend)
 npm install
-
-# Install backend dependencies
-cd backend
-npm install
-cd ..
-
-# Install frontend dependencies
-cd frontend
-npm install
-cd ..
 ```
+
+This single command will install dependencies for the entire monorepo. You don't need to run `npm install` in the backend or frontend directories separately.
 
 #### Start Services
 
@@ -75,15 +69,16 @@ cd ..
 # Terminal 1: Start Docker infrastructure
 cd infrastructure
 docker-compose up -d
+cd ..
 
-# Terminal 2: Start backend
-cd backend
-npm run dev
+# Terminal 2: Start backend (from project root)
+npm run dev --workspace=backend
 
-# Terminal 3: Start frontend
-cd frontend
-npm run dev
+# Terminal 3: Start frontend (from project root)
+npm run dev --workspace=frontend
 ```
+
+**Note:** Always run dev commands from the project root using the `--workspace` flag. This ensures the commands can find all dependencies installed in the root `node_modules`.
 
 For detailed manual setup instructions, see [QUICK_START_GUIDE.md](./QUICK_START_GUIDE.md).
 
@@ -314,6 +309,22 @@ Sample users (password: password123):
 - pgAdmin 4
 
 ## 🐛 Troubleshooting
+
+### 'nodemon' is not recognized or 'vite' is not recognized
+
+**Error**: `'nodemon' is not recognized as an internal or external command` or `'vite' is not recognized`
+
+**Cause**: Dependencies are not installed.
+
+**Solution**:
+```bash
+# From the project root directory
+npm install
+```
+
+This will install all dependencies for the monorepo (root, backend, and frontend). After installation, you can run the dev commands again.
+
+**Note**: This project uses npm workspaces. All dependencies are managed from the root directory.
 
 ### Docker containers won't start
 
