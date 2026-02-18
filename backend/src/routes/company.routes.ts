@@ -86,7 +86,7 @@ router.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/', createLimiter, (req, res) => companyController.createCompany(req, res));
+router.post('/', /* createLimiter */ (req, res) => companyController.createCompany(req, res));
 
 /**
  * @openapi

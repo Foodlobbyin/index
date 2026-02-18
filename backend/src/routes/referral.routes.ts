@@ -79,7 +79,7 @@ const referralRateLimiter = createRateLimiter(10, 15); // 10 requests per 15 min
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/validate', referralRateLimiter, referralController.validateReferral);
+router.post('/validate', /* referralRateLimiter */ referralController.validateReferral);
 
 /**
  * @openapi
@@ -141,7 +141,7 @@ router.post('/validate', referralRateLimiter, referralController.validateReferra
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/', authenticate, referralRateLimiter, referralController.createReferral);
+router.post('/', authenticate, /* referralRateLimiter */ referralController.createReferral);
 
 /**
  * @openapi
