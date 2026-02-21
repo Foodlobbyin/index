@@ -1,21 +1,30 @@
-# Node.js
-node_modules/
-
-# npm
-package-lock.json
-
-# React / Vite
-build/
-dist/
-
-# Environment variables
+# Environment files (NEVER commit these!)
 .env
+.env.local
+.env.development
+.env.test
+.env.production
+backend/.env
+frontend/.env
+infrastructure/.env
+ENV_CONFIGURATION_ANSWERS*.txt
 
-# IDE settings
-.idea/
-.vscode/
+# Uploads (evidence files)
+uploads/
+backend/uploads/
+evidence/
 
-# Test coverage
-coverage/
-*.lcov
-.nyc_output/
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Existing entries
+
