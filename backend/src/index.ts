@@ -77,6 +77,7 @@ app.get('/api/health', (req, res) => {
       referralSystem: true,
       otpVerification: true,
       gstnValidation: true,
+      incidentManagement: true,
     }
   });
 });
