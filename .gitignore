@@ -26,5 +26,14 @@ Thumbs.db
 *.swp
 *.swo
 
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build artifacts
+dist/
+build/
+coverage/
+
 # Existing entries
 
