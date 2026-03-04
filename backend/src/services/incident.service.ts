@@ -5,7 +5,7 @@ import pool from '../config/database';
 
 export class IncidentService {
   async createIncident(data: IncidentCreateInput): Promise<Incident> {
-    gstnService.assertValid(data.company_gstn);
+    if (data.company_gstn) gstnService.assertValid(data.company_gstn);
 
     if (!data.company_name?.trim()) throw new Error('Company name is required');
     if (!data.incident_title?.trim()) throw new Error('Incident title is required');

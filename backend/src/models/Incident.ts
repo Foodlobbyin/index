@@ -1,64 +1,78 @@
+export type IncidentType =
+  | 'FRAUD'
+  | 'QUALITY_ISSUE'
+  | 'SERVICE_ISSUE'
+  | 'PAYMENT_ISSUE'
+  | 'CONTRACT_BREACH'
+  | 'OTHER';
+
+export type IncidentStatus =
+  | 'draft'
+  | 'submitted'
+  | 'under_review'
+  | 'approved'
+  | 'rejected'
+  | 'resolved';
+
 export interface Incident {
   id: number;
-  user_id: number;
-  title: string;
+  company_gstn?: string;
+  company_name: string;
+  incident_type: IncidentType;
+  incident_date: Date;
+  incident_title: string;
   description: string;
-  category: IncidentCategory;
-  severity: IncidentSeverity;
+  amount_involved?: number;
+  currency_code: string;
+  reporter_id?: number;
+  is_anonymous: boolean;
+  reporter_name?: string;
+  reporter_email?: string;
+  reporter_phone?: string;
   status: IncidentStatus;
-  restaurant_name?: string;
-  location?: string;
-  date_occurred: Date;
-  evidence_urls?: string[];
-  resolution_notes?: string;
-  resolved_at?: Date;
+  moderator_notes?: string;
+  reviewed_by?: number;
+  reviewed_at?: Date;
+  rejection_reason?: string;
   created_at: Date;
   updated_at: Date;
 }
 
-export enum IncidentCategory {
-  FOOD_QUALITY = 'food_quality',
-  HYGIENE = 'hygiene',
-  SERVICE = 'service',
-  PRICING = 'pricing',
-  SAFETY = 'safety',
-  OTHER = 'other'
-}
-
-export enum IncidentSeverity {
-  LOW = 'low',
-  MEDIUM = 'medium',
-  HIGH = 'high',
-  CRITICAL = 'critical'
-}
-
-export enum IncidentStatus {
-  PENDING = 'pending',
-  UNDER_REVIEW = 'under_review',
-  RESOLVED = 'resolved',
-  REJECTED = 'rejected'
-}
-
 export interface IncidentCreateInput {
-  title: string;
+  company_gstn?: string;
+  company_name: string;
+  incident_type: IncidentType;
+  incident_date: Date | string;
+  incident_title: string;
   description: string;
-  category: IncidentCategory;
-  severity: IncidentSeverity;
-  restaurant_name?: string;
-  location?: string;
-  date_occurred: Date;
-  evidence_urls?: string[];
+  amount_involved?: number;
+  currency_code?: string;
+  is_anonymous?: boolean;
+  reporter_id?: number;
+  reporter_name?: string;
+  reporter_email?: string;
+  reporter_phone?: string;
 }
 
 export interface IncidentUpdateInput {
-  title?: string;
+  company_gstn?: string;
+  company_name?: string;
+  incident_type?: IncidentType;
+  incident_date?: Date | string;
+  incident_title?: string;
   description?: string;
-  category?: IncidentCategory;
-  severity?: IncidentSeverity;
-  status?: IncidentStatus;
-  restaurant_name?: string;
-  location?: string;
-  date_occurred?: Date;
-  evidence_urls?: string[];
-  resolution_notes?: string;
+  amount_involved?: number;
+  currency_code?: string;
+  reporter_name?: string;
+  reporter_email?: string;
+  reporter_phone?: string;
+}
+
+export interface IncidentSearchParams {
+  gstn?: string;
+  company_name?: string;
+  incident_type?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
 }
