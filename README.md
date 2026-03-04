@@ -2,6 +2,13 @@
 
 A full-stack TypeScript mono-repo application for B2B companies to manage company profiles, invoice data, and view aggregated market insights.
 
+**New here? Start with [START_HERE.md](./START_HERE.md) for a step-by-step guide to running the app.**
+
+Other documentation:
+- [docs/PROJECT_OVERVIEW_AND_STATUS.md](./docs/PROJECT_OVERVIEW_AND_STATUS.md) — current project status
+- [docs/ROADMAP.md](./docs/ROADMAP.md) — planned features and milestones
+- [docs/NEXT_STEPS.md](./docs/NEXT_STEPS.md) — practical next actions based on your available time
+
 ## 🏗️ Project Structure
 
 ```

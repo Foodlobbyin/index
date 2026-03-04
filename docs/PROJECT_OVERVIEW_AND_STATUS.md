@@ -27,3 +27,6 @@ However, some areas still require attention:
 ---
 
 This document serves as the primary reference for project status, roadmap, and next steps moving forward. Please refer back to the repository regularly for updates.
+
+- For the full feature roadmap, see [ROADMAP.md](./ROADMAP.md).
+- For practical guidance on what to work on next, see [NEXT_STEPS.md](./NEXT_STEPS.md).
