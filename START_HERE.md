@@ -88,6 +88,10 @@ When you are done:
 
 ## Troubleshooting
 
+**Database is missing tables or the backend reports schema errors**
+- The database schema is applied automatically the first time Docker creates the database volume.
+- If you need to rebuild the schema from scratch (e.g. after a schema change), delete the existing volume and restart: `cd infrastructure && docker-compose down -v && docker-compose up -d`.
+
 **"Docker is not running"**
 - Open Docker Desktop and wait until it shows a green "Running" status, then try again.
 
