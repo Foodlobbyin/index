@@ -9,6 +9,10 @@ import Homepage from './pages/Homepage';
 import NewsPage from './pages/NewsPage';
 import PublicLayout from './components/PublicLayout';
 import AppShell from './pages/AppShell';
+import InvoiceList from './pages/InvoiceList';
+import InvoiceCreatePage from './pages/InvoiceCreatePage';
+import InvoiceDetailPage from './pages/InvoiceDetailPage';
+import InvoiceEditPage from './pages/InvoiceEditPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 export default function App(): JSX.Element {
@@ -26,8 +30,42 @@ export default function App(): JSX.Element {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
-          
-          {/* Protected app shell */}
+
+          {/* Protected invoice routes */}
+          <Route
+            path="/app/invoices"
+            element={
+              <ProtectedRoute>
+                <InvoiceList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/invoices/new"
+            element={
+              <ProtectedRoute>
+                <InvoiceCreatePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/invoices/:id/edit"
+            element={
+              <ProtectedRoute>
+                <InvoiceEditPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/invoices/:id"
+            element={
+              <ProtectedRoute>
+                <InvoiceDetailPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Protected app shell (catch-all for /app/*) */}
           <Route
             path="/app/*"
             element={
