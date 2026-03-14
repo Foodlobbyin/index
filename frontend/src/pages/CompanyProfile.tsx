@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import Layout from '../components/Layout';
 import { companyService, Company, CompanyInput } from '../services/companyService';
+import { reputationService, ReputationData } from '../services/reputationService';
 
 export default function CompanyProfile(): JSX.Element {
   const [company, setCompany] = useState<Company | null>(null);
@@ -18,10 +19,18 @@ export default function CompanyProfile(): JSX.Element {
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [reputation, setReputation] = useState<ReputationData | null>(null);
 
   useEffect(() => {
     fetchCompany();
   }, []);
+
+  useEffect(() => {
+    if (!company?.id) return;
+    reputationService.getReputation(company.id)
+      .then(setReputation)
+      .catch(() => {}); // reputation is supplementary; ignore errors silently
+  }, [company?.id]);
 
   const fetchCompany = async () => {
     setLoading(true);
@@ -134,6 +143,18 @@ export default function CompanyProfile(): JSX.Element {
 
   return (
     <Layout>
+      {reputation && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <h2 style={{ color: '#2c3e50', marginBottom: '12px' }}>Reputation Score</h2>
+          <p><strong>Score:</strong> {reputation.reputation_score}</p>
+          <p><strong>Total Incidents:</strong> {reputation.total_incidents}</p>
+          <p><strong>Resolved:</strong> {reputation.resolved_incidents}</p>
+          <p><strong>Unresolved:</strong> {reputation.unresolved_incidents}</p>
+          {reputation.last_updated && (
+            <p><strong>Last Updated:</strong> {new Date(reputation.last_updated).toLocaleString()}</p>
+          )}
+        </div>
+      )}
       <div style={cardStyle}>
         <h1 style={{ color: '#2c3e50', marginBottom: '30px' }}>
           {isEditing ? 'Edit Company Profile' : 'Create Company Profile'}
