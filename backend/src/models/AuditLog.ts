@@ -24,3 +24,13 @@ export interface AuditLogSearchResult {
   limit: number;
   total_pages: number;
 }
+
+/** Input for writing a general-purpose audit log entry to the audit_logs table. */
+export interface WriteAuditLogInput {
+  user_id?: number | null;
+  action: string;
+  entity_type?: string | null;
+  entity_id?: number | null;
+  details?: Record<string, unknown> | null;
+  ip_address?: string | null;
+}

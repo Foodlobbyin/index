@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import companyService from '../services/company.service';
+import auditLogService from '../services/auditLog.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 export class CompanyController {
@@ -11,6 +12,18 @@ export class CompanyController {
       }
 
       const company = await companyService.createCompany(req.user.id, req.body);
+
+      try {
+        await auditLogService.writeLog({
+          user_id: req.user.id,
+          action: 'company_profile_created',
+          entity_type: 'company',
+          entity_id: company.id,
+          details: { company_name: company.company_name },
+          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(201).json(company);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -45,6 +58,18 @@ export class CompanyController {
 
       const companyId = parseInt(req.params.id);
       const company = await companyService.updateCompany(companyId, req.body);
+
+      try {
+        await auditLogService.writeLog({
+          user_id: req.user.id,
+          action: 'company_profile_updated',
+          entity_type: 'company',
+          entity_id: companyId,
+          details: { updated_fields: Object.keys(req.body) },
+          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(200).json(company);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -60,6 +85,17 @@ export class CompanyController {
 
       const companyId = parseInt(req.params.id);
       await companyService.deleteCompany(companyId);
+
+      try {
+        await auditLogService.writeLog({
+          user_id: req.user.id,
+          action: 'company_profile_deleted',
+          entity_type: 'company',
+          entity_id: companyId,
+          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(204).send();
     } catch (error: any) {
       res.status(400).json({ error: error.message });
