@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Search, MessageSquare, LogOut, User, ClipboardList } from 'lucide-react';
+import { Search, MessageSquare, LogOut, User, ClipboardList, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Tabs from '../components/ui/Tabs';
 import SearchSubmitSection from '../components/app/SearchSubmitSection';
@@ -41,6 +41,17 @@ const AppShell: React.FC = () => {
               </div>
               <span className="text-xl font-bold text-gray-900">Foodlobbyin</span>
             </Link>
+
+            {/* App navigation links */}
+            <nav className="hidden md:flex items-center space-x-1 ml-8">
+              <Link
+                to="/app/invoices"
+                className="flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              >
+                <FileText size={16} />
+                <span>Invoices</span>
+              </Link>
+            </nav>
 
             {/* User Menu */}
             <div className="relative">
