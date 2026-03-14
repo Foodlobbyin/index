@@ -8,6 +8,7 @@ export interface User {
   first_name?: string;
   last_name?: string;
   email_verified: boolean;
+  trust_level?: 'new' | 'verified' | 'trusted' | 'moderator' | 'admin';
 }
 
 export interface LoginData {

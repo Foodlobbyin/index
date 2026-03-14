@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Search, MessageSquare, LogOut, User, ClipboardList } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Tabs from '../components/ui/Tabs';
@@ -7,14 +7,20 @@ import SearchSubmitSection from '../components/app/SearchSubmitSection';
 import ForumSection from '../components/app/ForumSection';
 import AuditLogPage from './AuditLogPage';
 
+const AUDIT_LOG_TRUST_LEVELS: ReadonlyArray<'moderator' | 'admin'> = ['moderator', 'admin'];
+
 const AppShell: React.FC = () => {
   const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
+  const canAccessAuditLogs = !!user?.trust_level && AUDIT_LOG_TRUST_LEVELS.includes(user.trust_level);
+
   const tabs = [
     { id: 'search', label: 'Search & Submit', icon: <Search size={18} /> },
     { id: 'forum', label: 'Industry Forum', icon: <MessageSquare size={18} /> },
-    { id: 'auditlogs', label: 'Audit Logs', icon: <ClipboardList size={18} /> },
+    ...(canAccessAuditLogs
+      ? [{ id: 'auditlogs', label: 'Audit Logs', icon: <ClipboardList size={18} /> }]
+      : []),
   ];
 
   const handleLogout = () => {
@@ -87,7 +93,9 @@ const AppShell: React.FC = () => {
             <>
               {activeTab === 'search' && <SearchSubmitSection />}
               {activeTab === 'forum' && <ForumSection />}
-              {activeTab === 'auditlogs' && <AuditLogPage />}
+              {activeTab === 'auditlogs' && (
+                canAccessAuditLogs ? <AuditLogPage /> : <Navigate to="/" replace />
+              )}
             </>
           )}
         </Tabs>
