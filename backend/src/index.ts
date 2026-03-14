@@ -9,6 +9,7 @@ import invoiceRoutes from './routes/invoice.routes';
 import insightsRoutes from './routes/insights.routes';
 import incidentRoutes from './routes/incident.routes';
 import moderationRoutes from './routes/moderation.routes';
+import reputationRoutes from './routes/reputation.routes';
 import { apiLimiter } from './middleware/rateLimiter';
 import { setupSwagger } from './config/swagger';
 
@@ -91,6 +92,7 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/insights', insightsRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/moderation', moderationRoutes);
+app.use('/api/reputation', reputationRoutes);
 
 // 404 handler
 app.use((req, res) => {
