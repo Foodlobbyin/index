@@ -5,6 +5,7 @@ import moderationController from '../controllers/moderation.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { uploadMiddleware } from '../middleware/upload.middleware';
 import { apiLimiter, createLimiter } from '../middleware/rateLimiter';
+import { requireMinTrustLevel } from '../middleware/trustLevel.middleware';
 
 const router = Router();
 
@@ -12,8 +13,10 @@ const router = Router();
 router.use(apiLimiter);
 
 // Public routes
-router.post('/submit', createLimiter, incidentController.submit.bind(incidentController));
 router.get('/search', incidentController.search.bind(incidentController));
+
+// Authenticated + verified users only: report an incident (trust_level >= 1)
+router.post('/submit', authMiddleware, requireMinTrustLevel('verified'), createLimiter, incidentController.submit.bind(incidentController));
 
 // Authenticated user routes - order matters: specific paths before parameterised
 router.get('/my-reports', authMiddleware, incidentController.myReports.bind(incidentController));
@@ -26,7 +29,8 @@ router.get('/:id', incidentController.getById.bind(incidentController));
 
 // Authenticated user routes for specific incident
 router.put('/:id', authMiddleware, incidentController.update.bind(incidentController));
-router.delete('/:id', authMiddleware, incidentController.delete.bind(incidentController));
+// Admins only: delete any incident (trust_level >= 4)
+router.delete('/:id', authMiddleware, requireMinTrustLevel('admin'), incidentController.delete.bind(incidentController));
 
 // Evidence routes
 router.post(
