@@ -7,6 +7,12 @@ import { Router } from 'express';
 import secureAuthController from '../controllers/secure-auth.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { authRateLimiter, otpRateLimiter } from '../middleware/rateLimiter';
+import {
+  validate,
+  loginSchema,
+  requestEmailOTPSchema,
+  loginWithOTPSchema,
+} from '../middleware/validate.middleware';
 
 const router = Router();
 
@@ -168,7 +174,7 @@ router.post('/register', /* authRateLimiter */ secureAuthController.register);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/verify-otp', /* otpRateLimiter */ secureAuthController.verifyOTP);
+router.post('/verify-otp', /* otpRateLimiter */ validate(loginWithOTPSchema), secureAuthController.verifyOTP);
 
 /**
  * @openapi
@@ -209,7 +215,7 @@ router.post('/verify-otp', /* otpRateLimiter */ secureAuthController.verifyOTP);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/request-otp', /* otpRateLimiter */ secureAuthController.requestOTP);
+router.post('/request-otp', /* otpRateLimiter */ validate(requestEmailOTPSchema), secureAuthController.requestOTP);
 
 /**
  * @openapi
@@ -262,7 +268,7 @@ router.post('/request-otp', /* otpRateLimiter */ secureAuthController.requestOTP
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/login', /* authRateLimiter */ secureAuthController.login);
+router.post('/login', /* authRateLimiter */ validate(loginSchema), secureAuthController.login);
 
 /**
  * @openapi

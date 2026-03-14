@@ -1,3 +1,27 @@
+/**
+ * AuthService - JWT Token Strategy & Known Limitations
+ * -------------------------------------------------------
+ * Tokens: JWT (HS256), 7-day expiry, signed with JWT_SECRET env var.
+ *
+ * LIMITATIONS:
+ *  1. No refresh-token mechanism - once issued, a token is valid for the full
+ *     7-day window and cannot be silently renewed without a new login.
+ *  2. No server-side token revocation - logging out only removes the token
+ *     client-side. A stolen or leaked token remains valid until it expires.
+ *  3. No token rotation - all active sessions share the same secret; rotating
+ *     JWT_SECRET invalidates ALL existing tokens simultaneously.
+ *
+ * RECOMMENDED NEXT STEPS:
+ *  - Implement a refresh-token pair (short-lived access token ~15 min +
+ *    long-lived refresh token ~30 days stored in httpOnly cookie).
+ *  - Maintain a token denylist (e.g. Redis set of jti/revoked tokens) to
+ *    support immediate logout and forced session invalidation.
+ *  - Consider adding jti (JWT ID) claim to each token to enable per-token
+ *    revocation without affecting other active sessions.
+ *  - Scope tokens with a list of allowed roles/trust_levels at issuance time
+ *    so that privilege de-escalation takes effect without waiting for expiry.
+ */
+
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
