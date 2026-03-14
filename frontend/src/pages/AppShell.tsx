@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, MessageSquare, LogOut, User } from 'lucide-react';
+import { Search, MessageSquare, LogOut, User, ClipboardList } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Tabs from '../components/ui/Tabs';
 import SearchSubmitSection from '../components/app/SearchSubmitSection';
 import ForumSection from '../components/app/ForumSection';
+import AuditLogPage from './AuditLogPage';
 
 const AppShell: React.FC = () => {
   const { user, logout } = useAuth();
@@ -13,6 +14,7 @@ const AppShell: React.FC = () => {
   const tabs = [
     { id: 'search', label: 'Search & Submit', icon: <Search size={18} /> },
     { id: 'forum', label: 'Industry Forum', icon: <MessageSquare size={18} /> },
+    { id: 'auditlogs', label: 'Audit Logs', icon: <ClipboardList size={18} /> },
   ];
 
   const handleLogout = () => {
@@ -85,6 +87,7 @@ const AppShell: React.FC = () => {
             <>
               {activeTab === 'search' && <SearchSubmitSection />}
               {activeTab === 'forum' && <ForumSection />}
+              {activeTab === 'auditlogs' && <AuditLogPage />}
             </>
           )}
         </Tabs>
