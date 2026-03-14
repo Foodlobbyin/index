@@ -44,7 +44,7 @@ export default function Navigation(): JSX.Element {
         <div>
           <Link to="/" style={linkStyle}>Dashboard</Link>
           <Link to="/company" style={linkStyle}>Company</Link>
-          <Link to="/invoices" style={linkStyle}>Invoices</Link>
+          <Link to="/app/invoices" style={linkStyle}>Invoices</Link>
           <Link to="/insights" style={linkStyle}>Insights</Link>
         </div>
       </div>

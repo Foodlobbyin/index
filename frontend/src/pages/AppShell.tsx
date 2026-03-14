@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Navigate, NavLink, Routes, Route, useLocation } from 'react-router-dom';
-import { Search, MessageSquare, LogOut, User, ClipboardList, AlertTriangle, Shield } from 'lucide-react';
+import { Search, MessageSquare, LogOut, User, ClipboardList, AlertTriangle, Shield, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Tabs from '../components/ui/Tabs';
 import SearchSubmitSection from '../components/app/SearchSubmitSection';
@@ -81,6 +81,10 @@ const AppShell: React.FC = () => {
                   <span>Moderation</span>
                 </NavLink>
               )}
+            <NavLink to="/app/invoices" className={navLinkClass}>
+                <FileText size={16} />
+                <span>Invoices</span>
+              </NavLink>
             </nav>
 
             {/* User Menu */}

@@ -5,6 +5,7 @@
 
 import { Response } from 'express';
 import secureAuthService from '../services/secure-auth.service';
+import auditLogService from '../services/auditLog.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 export class SecureAuthController {
@@ -84,6 +85,15 @@ export class SecureAuthController {
         captcha_token
       );
 
+      try {
+        await auditLogService.writeLog({
+          action: 'user_registered',
+          entity_type: 'user',
+          details: { username, email, gstn },
+          ip_address,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(201).json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -115,6 +125,17 @@ export class SecureAuthController {
         { email, otp, captcha_token },
         ip_address
       );
+
+      try {
+        await auditLogService.writeLog({
+          user_id: result.user.id,
+          action: 'email_verified',
+          entity_type: 'user',
+          entity_id: result.user.id,
+          details: { email },
+          ip_address,
+        });
+      } catch { /* audit log failure must not break the main action */ }
 
       res.status(200).json(result);
     } catch (error: any) {
@@ -151,6 +172,7 @@ export class SecureAuthController {
    * POST /api/auth/login
    */
   async login(req: AuthRequest, res: Response): Promise<void> {
+    const ip_address = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
     try {
       const { username, password } = req.body;
 
@@ -161,8 +183,27 @@ export class SecureAuthController {
 
       const result = await secureAuthService.login({ username, password });
 
+      try {
+        await auditLogService.writeLog({
+          user_id: result.user.id,
+          action: 'user_login',
+          entity_type: 'user',
+          entity_id: result.user.id,
+          details: { username: result.user.username },
+          ip_address,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(200).json(result);
     } catch (error: any) {
+      try {
+        await auditLogService.writeLog({
+          action: 'user_login_failed',
+          entity_type: 'user',
+          details: { username: req.body?.username, reason: error.message },
+          ip_address,
+        });
+      } catch { /* audit log failure must not break the main action */ }
       res.status(401).json({ error: error.message });
     }
   }

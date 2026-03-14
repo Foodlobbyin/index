@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import invoiceService from '../services/invoice.service';
+import auditLogService from '../services/auditLog.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 export class InvoiceController {
@@ -11,6 +12,18 @@ export class InvoiceController {
       }
 
       const invoice = await invoiceService.createInvoice(req.user.id, req.body);
+
+      try {
+        await auditLogService.writeLog({
+          user_id: req.user.id,
+          action: 'invoice_created',
+          entity_type: 'invoice',
+          entity_id: invoice.id,
+          details: { invoice_id: invoice.id, amount: invoice.amount, invoice_number: invoice.invoice_number },
+          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(201).json(invoice);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -59,6 +72,18 @@ export class InvoiceController {
 
       const invoiceId = parseInt(req.params.id);
       const invoice = await invoiceService.updateInvoice(invoiceId, req.user.id, req.body);
+
+      try {
+        await auditLogService.writeLog({
+          user_id: req.user.id,
+          action: 'invoice_updated',
+          entity_type: 'invoice',
+          entity_id: invoiceId,
+          details: { invoice_id: invoiceId, changed_fields: Object.keys(req.body) },
+          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(200).json(invoice);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -74,6 +99,18 @@ export class InvoiceController {
 
       const invoiceId = parseInt(req.params.id);
       await invoiceService.deleteInvoice(invoiceId, req.user.id);
+
+      try {
+        await auditLogService.writeLog({
+          user_id: req.user.id,
+          action: 'invoice_deleted',
+          entity_type: 'invoice',
+          entity_id: invoiceId,
+          details: { invoice_id: invoiceId },
+          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(204).send();
     } catch (error: any) {
       res.status(400).json({ error: error.message });
