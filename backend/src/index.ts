@@ -1,6 +1,6 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes';
 import secureAuthRoutes from './routes/secure-auth.routes';
 import referralRoutes from './routes/referral.routes';
@@ -11,11 +11,9 @@ import incidentRoutes from './routes/incident.routes';
 import moderationRoutes from './routes/moderation.routes';
 import reputationRoutes from './routes/reputation.routes';
 import auditLogRoutes from './routes/auditLog.routes';
+import healthRoutes from './routes/health';
 import { apiLimiter } from './middleware/rateLimiter';
 import { setupSwagger } from './config/swagger';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -85,6 +83,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Routes
+app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes); // Legacy auth routes
 app.use('/api/secure-auth', secureAuthRoutes); // New secure auth routes with referral
 app.use('/api/referrals', referralRoutes); // Referral management routes
