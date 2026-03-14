@@ -39,8 +39,15 @@ const AuditLogPage: React.FC = () => {
         setParams((prev) => ({ ...prev, ...overrides }));
       }
     } catch (err: unknown) {
+      const axiosErrorMessage =
+        (err as any)?.response?.data?.error ??
+        (err as any)?.response?.data?.message;
       const message =
-        err instanceof Error ? err.message : 'Failed to fetch audit logs. Please try again.';
+        typeof axiosErrorMessage === 'string' && axiosErrorMessage.trim()
+          ? axiosErrorMessage
+          : err instanceof Error
+          ? err.message
+          : 'Failed to fetch audit logs. Please try again.';
       setError(message);
     } finally {
       setLoading(false);
