@@ -83,8 +83,8 @@ export class AuthController {
         return;
       }
 
-      if (newPassword.length < 6) {
-        res.status(400).json({ error: 'Password must be at least 6 characters long' });
+      if (newPassword.length < 8) {
+        res.status(400).json({ error: 'Password must be at least 8 characters' });
         return;
       }
 

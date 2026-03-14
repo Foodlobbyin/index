@@ -2,6 +2,7 @@ import { Router } from 'express';
 import moderationController from '../controllers/moderation.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { apiLimiter } from '../middleware/rateLimiter';
+import { requireMinTrustLevel } from '../middleware/trustLevel.middleware';
 
 const router = Router();
 
@@ -11,9 +12,9 @@ router.use(apiLimiter);
 // All moderation routes require authentication
 router.use(authMiddleware);
 
-router.get('/queue', moderationController.getQueue.bind(moderationController));
-router.put('/incidents/:id/approve', moderationController.approve.bind(moderationController));
-router.put('/incidents/:id/reject', moderationController.reject.bind(moderationController));
-router.post('/incidents/:id/penalty', moderationController.addPenalty.bind(moderationController));
+router.get('/queue', requireMinTrustLevel('moderator'), moderationController.getQueue.bind(moderationController));
+router.put('/incidents/:id/approve', requireMinTrustLevel('moderator'), moderationController.approve.bind(moderationController));
+router.put('/incidents/:id/reject', requireMinTrustLevel('moderator'), moderationController.reject.bind(moderationController));
+router.post('/incidents/:id/penalty', requireMinTrustLevel('moderator'), moderationController.addPenalty.bind(moderationController));
 
 export default router;

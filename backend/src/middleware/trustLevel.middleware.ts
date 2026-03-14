@@ -1,9 +1,9 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth.middleware';
 
-type TrustLevel = 'new' | 'verified' | 'trusted' | 'moderator' | 'admin';
+export type TrustLevel = 'new' | 'verified' | 'trusted' | 'moderator' | 'admin';
 
-const TRUST_LEVEL_RANK: Record<TrustLevel, number> = {
+export const TRUST_LEVEL_RANK: Record<TrustLevel, number> = {
   new: 0,
   verified: 1,
   trusted: 2,
@@ -30,7 +30,7 @@ export const requireTrustLevel = (...levels: TrustLevel[]) =>
   };
 
 /**
- * Middleware that requires the user to have AT LEAST the specified trust level rank.
+ * Middleware that requires the user to have AT LEAST the specified trust level rank (string variant).
  * e.g. requireMinTrustLevel('verified') allows verified, trusted, moderator, admin
  */
 export const requireMinTrustLevel = (minLevel: TrustLevel) =>
@@ -43,6 +43,26 @@ export const requireMinTrustLevel = (minLevel: TrustLevel) =>
       res.status(403).json({
         error: 'Forbidden',
         message: `This action requires at least trust level: ${minLevel}`,
+      });
+      return;
+    }
+    next();
+  };
+
+/**
+ * Middleware factory that requires the user to have AT LEAST the specified numeric trust level.
+ * Numeric tiers: 0=new/unverified, 1=verified/basic, 2=trusted, 3=moderator, 4=admin
+ * Usage: router.post('/path', authMiddleware, requireMinTrustLevelNumeric(1), handler)
+ */
+export const requireMinTrustLevelNumeric = (minRank: number) =>
+  (req: AuthRequest, res: Response, next: NextFunction): void => {
+    const rawLevel = req.user?.trust_level;
+    const userLevel = rawLevel && rawLevel in TRUST_LEVEL_RANK ? (rawLevel as TrustLevel) : undefined;
+    const userRank = userLevel !== undefined ? TRUST_LEVEL_RANK[userLevel] : -1;
+    if (userRank < minRank) {
+      res.status(403).json({
+        error: 'Forbidden',
+        message: `This action requires trust level ${minRank} or higher`,
       });
       return;
     }
