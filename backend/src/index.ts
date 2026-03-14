@@ -10,6 +10,7 @@ import insightsRoutes from './routes/insights.routes';
 import incidentRoutes from './routes/incident.routes';
 import moderationRoutes from './routes/moderation.routes';
 import reputationRoutes from './routes/reputation.routes';
+import auditLogRoutes from './routes/auditLog.routes';
 import { apiLimiter } from './middleware/rateLimiter';
 import { setupSwagger } from './config/swagger';
 
@@ -28,7 +29,7 @@ app.use(express.urlencoded({ extended: true }));
 setupSwagger(app);
 
 // Apply general rate limiting to all API routes
-// app.use('/api', apiLimiter);  // Temporarily disabled due to type conflicts
+app.use('/api', apiLimiter as unknown as express.RequestHandler);
 
 // Health check
 /**
@@ -93,6 +94,7 @@ app.use('/api/insights', insightsRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/moderation', moderationRoutes);
 app.use('/api/reputation', reputationRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
 
 // 404 handler
 app.use((req, res) => {
