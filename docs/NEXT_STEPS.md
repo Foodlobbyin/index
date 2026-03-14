@@ -36,17 +36,22 @@ Run a basic smoke test to confirm the core workflows are functioning.
 
 ## If you want to build next
 
-Two areas are ready to be worked on. Choose one to focus on:
+All previously listed options (Reputation system and Audit log search) have been completed and merged. The next recommended areas to work on are:
 
-**Option A: Reputation system**
-- What it does: Scores vendors based on incident history and community feedback.
-- Why it matters: It is a core trust feature for the platform.
-- Where to start: Review the existing reputation-related code in the backend. See [docs/ROADMAP.md](./ROADMAP.md) for context.
+**Option A: Role-based access control (RBAC)**
+- What it does: Restricts sensitive routes and UI (e.g. Audit Logs tab, moderation endpoints) to admin/moderator users only.
+- Why it matters: Currently all authenticated users can access the Audit Logs tab. The backend has no role enforcement beyond requiring a valid token.
+- Where to start: Add a `role` column to the `users` table, include it in the JWT payload, create a role-check middleware, and update the frontend AppShell to conditionally show the Audit Logs tab.
 
-**Option B: Audit log search history**
-- What it does: Lets administrators search and filter the audit log.
-- Why it matters: Auditors need to be able to find specific events quickly.
-- Where to start: Review the audit log routes and database tables. See [docs/ROADMAP.md](./ROADMAP.md) for context.
+**Option B: Enhanced reputation scoring**
+- What it does: Refines the reputation score calculation to weight incidents by severity and recency, not just raw counts.
+- Why it matters: A flat count of incidents does not distinguish between minor and major issues.
+- Where to start: Review `backend/src/services/reputation.service.ts` and update the scoring formula.
+
+**Option C: Incident UI improvements**
+- What it does: Adds better filtering, status timeline, and bulk moderation actions to the incidents pages.
+- Why it matters: The backend incident and moderation APIs are complete but the frontend experience is basic.
+- Where to start: Review `frontend/src/pages/` for any existing incident-related pages and plan enhancements.
 
 ---
 
