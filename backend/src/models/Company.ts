@@ -10,6 +10,7 @@ export interface Company {
   country?: string;
   website?: string;
   updated_at: Date;
+  reputation_score?: number;
 }
 
 export interface CompanyCreateInput {
