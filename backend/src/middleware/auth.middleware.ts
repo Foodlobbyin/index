@@ -5,6 +5,7 @@ export interface AuthRequest extends Request {
   user?: {
     id: number;
     username: string;
+    trust_level: string;
   };
 }
 

@@ -70,7 +70,7 @@ export class AuthService {
     }
 
     // Generate JWT token
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, {
+    const token = jwt.sign({ id: user.id, username: user.username, trust_level: user.trust_level }, JWT_SECRET, {
       expiresIn: '7d',
     });
 
@@ -100,7 +100,7 @@ export class AuthService {
     }
 
     // Generate token
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, {
+    const token = jwt.sign({ id: user.id, username: user.username, trust_level: user.trust_level }, JWT_SECRET, {
       expiresIn: '7d',
     });
 
@@ -191,7 +191,7 @@ export class AuthService {
     await userRepository.clearEmailOTP(user.id);
 
     // Generate JWT token
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, {
+    const token = jwt.sign({ id: user.id, username: user.username, trust_level: user.trust_level }, JWT_SECRET, {
       expiresIn: '7d',
     });
 

@@ -20,6 +20,10 @@ export interface User {
   otp_verification_count: number;
   otp_last_generated_at?: Date;
   otp_last_verified_at?: Date;
+  trust_level: 'new' | 'verified' | 'trusted' | 'moderator' | 'admin';
+  approved_incidents_count: number;
+  incidents_always_anonymous: boolean;
+  forums_default_anonymous: boolean;
   created_at: Date;
 }
 
@@ -67,6 +71,7 @@ export interface UserResponse {
   gstn?: string;
   email_verified: boolean;
   account_activated: boolean;
+  trust_level: 'new' | 'verified' | 'trusted' | 'moderator' | 'admin';
   created_at: Date;
 }
 

@@ -20,7 +20,7 @@ export class UserRepository {
     const result = await pool.query(
       `INSERT INTO users (username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires, account_activated) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, FALSE) 
-       RETURNING id, username, mobile_number, phone_number, email, first_name, last_name, gstn, email_verified, account_activated, created_at`,
+       RETURNING id, username, mobile_number, phone_number, email, first_name, last_name, gstn, email_verified, account_activated, trust_level, created_at`,
       [username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires]
     );
     return result.rows[0];
@@ -31,7 +31,7 @@ export class UserRepository {
     const result = await client.query(
       `INSERT INTO users (username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires, account_activated) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, FALSE) 
-       RETURNING id, username, mobile_number, phone_number, email, first_name, last_name, gstn, email_verified, account_activated, created_at`,
+       RETURNING id, username, mobile_number, phone_number, email, first_name, last_name, gstn, email_verified, account_activated, trust_level, created_at`,
       [username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires]
     );
     return result.rows[0];
@@ -54,7 +54,7 @@ export class UserRepository {
 
   async findById(id: number): Promise<UserResponse | null> {
     const result = await pool.query(
-      'SELECT id, username, mobile_number, email, first_name, last_name, email_verified, created_at FROM users WHERE id = $1',
+      'SELECT id, username, mobile_number, email, first_name, last_name, email_verified, trust_level, created_at FROM users WHERE id = $1',
       [id]
     );
     return result.rows[0] || null;
