@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import authService from '../services/auth.service';
+import auditLogService from '../services/auditLog.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 export class AuthController {
@@ -20,6 +21,18 @@ export class AuthController {
         first_name, 
         last_name 
       });
+
+      try {
+        await auditLogService.writeLog({
+          user_id: result.user.id,
+          action: 'user_registered',
+          entity_type: 'user',
+          entity_id: result.user.id,
+          details: { username: result.user.username, email: result.user.email },
+          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(201).json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -27,6 +40,7 @@ export class AuthController {
   }
 
   async login(req: AuthRequest, res: Response): Promise<void> {
+    const ip_address = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress;
     try {
       const { username, password } = req.body;
 
@@ -36,8 +50,28 @@ export class AuthController {
       }
 
       const result = await authService.login({ username, password });
+
+      try {
+        await auditLogService.writeLog({
+          user_id: result.user.id,
+          action: 'user_login',
+          entity_type: 'user',
+          entity_id: result.user.id,
+          details: { username: result.user.username },
+          ip_address,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(200).json(result);
     } catch (error: any) {
+      try {
+        await auditLogService.writeLog({
+          action: 'user_login_failed',
+          entity_type: 'user',
+          details: { username: req.body?.username, reason: error.message },
+          ip_address,
+        });
+      } catch { /* audit log failure must not break the main action */ }
       res.status(401).json({ error: error.message });
     }
   }
@@ -52,6 +86,15 @@ export class AuthController {
       }
 
       const result = await authService.verifyEmail(token);
+
+      try {
+        await auditLogService.writeLog({
+          action: 'email_verified',
+          entity_type: 'user',
+          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(200).json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -68,6 +111,16 @@ export class AuthController {
       }
 
       const result = await authService.requestPasswordReset(email);
+
+      try {
+        await auditLogService.writeLog({
+          action: 'password_reset_requested',
+          entity_type: 'user',
+          details: { email },
+          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(200).json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -89,6 +142,15 @@ export class AuthController {
       }
 
       const result = await authService.resetPassword(token, newPassword);
+
+      try {
+        await auditLogService.writeLog({
+          action: 'password_reset_completed',
+          entity_type: 'user',
+          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(200).json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -112,6 +174,7 @@ export class AuthController {
   }
 
   async loginWithEmailOTP(req: AuthRequest, res: Response): Promise<void> {
+    const ip_address = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress;
     try {
       const { email, otp } = req.body;
 
@@ -121,8 +184,28 @@ export class AuthController {
       }
 
       const result = await authService.loginWithEmailOTP({ email, otp });
+
+      try {
+        await auditLogService.writeLog({
+          user_id: result.user.id,
+          action: 'user_login',
+          entity_type: 'user',
+          entity_id: result.user.id,
+          details: { method: 'email_otp', email },
+          ip_address,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(200).json(result);
     } catch (error: any) {
+      try {
+        await auditLogService.writeLog({
+          action: 'user_login_failed',
+          entity_type: 'user',
+          details: { method: 'email_otp', email: req.body?.email, reason: error.message },
+          ip_address,
+        });
+      } catch { /* audit log failure must not break the main action */ }
       res.status(401).json({ error: error.message });
     }
   }

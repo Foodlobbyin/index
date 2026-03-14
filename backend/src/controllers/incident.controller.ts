@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import incidentService from '../services/incident.service';
+import auditLogService from '../services/auditLog.service';
 import { IncidentCreateInput, IncidentUpdateInput, IncidentSearchParams } from '../models/Incident';
 
 export class IncidentController {
@@ -29,6 +30,22 @@ export class IncidentController {
         reporter_id: req.user?.id,
       };
       const incident = await incidentService.createIncident(data);
+
+      try {
+        await auditLogService.writeLog({
+          user_id: req.user?.id,
+          action: 'incident_reported',
+          entity_type: 'incident',
+          entity_id: incident.id,
+          details: {
+            incident_id: incident.id,
+            company_gstn: incident.company_gstn,
+            is_anonymous: incident.is_anonymous,
+          },
+          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.status(201).json({ message: 'Incident submitted successfully', incident });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -199,6 +216,18 @@ export class IncidentController {
       }
       const data: IncidentUpdateInput = req.body;
       const incident = await incidentService.updateIncident(id, data, req.user.id);
+
+      try {
+        await auditLogService.writeLog({
+          user_id: req.user.id,
+          action: 'incident_updated',
+          entity_type: 'incident',
+          entity_id: id,
+          details: { incident_id: id, changed_fields: Object.keys(data) },
+          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.json({ message: 'Incident updated', incident });
     } catch (error: any) {
       if (error.message === 'Access denied') {
@@ -243,6 +272,18 @@ export class IncidentController {
         return;
       }
       await incidentService.deleteIncident(id, req.user.id);
+
+      try {
+        await auditLogService.writeLog({
+          user_id: req.user.id,
+          action: 'incident_deleted',
+          entity_type: 'incident',
+          entity_id: id,
+          details: { incident_id: id },
+          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
       res.json({ message: 'Incident deleted' });
     } catch (error: any) {
       if (error.message === 'Access denied') {

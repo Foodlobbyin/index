@@ -3,6 +3,7 @@ import { incidentResponseRepository, incidentPenaltyRepository } from '../reposi
 import { Incident } from '../models/Incident';
 import { IncidentResponse } from '../models/IncidentResponse';
 import { IncidentPenalty, IncidentPenaltyCreateInput } from '../models/IncidentPenalty';
+import auditLogService from './auditLog.service';
 import pool from '../config/database';
 
 export class ModerationService {
@@ -24,6 +25,17 @@ export class ModerationService {
     if (!updated) throw new Error('Failed to approve incident');
 
     await this.logModerationAction(id, moderatorId, 'approved', notes);
+
+    try {
+      await auditLogService.writeLog({
+        user_id: moderatorId,
+        action: 'incident_approved',
+        entity_type: 'incident',
+        entity_id: id,
+        details: { incident_id: id, moderator_user_id: moderatorId },
+      });
+    } catch { /* audit log failure must not break the main action */ }
+
     return updated;
   }
 
@@ -44,6 +56,17 @@ export class ModerationService {
     if (!updated) throw new Error('Failed to reject incident');
 
     await this.logModerationAction(id, moderatorId, 'rejected', reason);
+
+    try {
+      await auditLogService.writeLog({
+        user_id: moderatorId,
+        action: 'incident_rejected',
+        entity_type: 'incident',
+        entity_id: id,
+        details: { incident_id: id, moderator_user_id: moderatorId, reason },
+      });
+    } catch { /* audit log failure must not break the main action */ }
+
     return updated;
   }
 

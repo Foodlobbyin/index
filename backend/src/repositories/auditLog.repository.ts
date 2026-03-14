@@ -1,7 +1,22 @@
 import pool from '../config/database';
-import { AuditLog, AuditLogSearchParams, AuditLogSearchResult } from '../models/AuditLog';
+import { AuditLog, AuditLogSearchParams, AuditLogSearchResult, WriteAuditLogInput } from '../models/AuditLog';
 
 class AuditLogRepository {
+  async writeLog(input: WriteAuditLogInput): Promise<void> {
+    await pool.query(
+      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        input.user_id ?? null,
+        input.action,
+        input.entity_type ?? null,
+        input.entity_id ?? null,
+        input.details ?? null,
+        input.ip_address ?? null,
+      ]
+    );
+  }
+
   async search(params: AuditLogSearchParams): Promise<AuditLogSearchResult> {
     const page = params.page ?? 1;
     const limit = params.limit ?? 20;
