@@ -8,7 +8,7 @@ export interface IncidentTypeBreakdown {
 }
 
 export interface ReputationScore {
-  company_gstn: string;
+  company_gstn: string | null;  // null for non-GSTN / unregistered companies
   company_name: string;
   reputation_score: number;
   label: 'Excellent' | 'Good' | 'Fair' | 'Poor';
