@@ -9,10 +9,10 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    
+
     permissions:
       contents: read
-    
+
     services:
       postgres:
         image: postgres:15
@@ -27,7 +27,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    
+
     env:
       DB_USER: postgres
       DB_PASSWORD: postgres
@@ -36,27 +36,27 @@ jobs:
       DB_NAME: foodlobbyin
       JWT_SECRET: test-secret-for-ci
       NODE_ENV: test
-    
+
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Set up Node.js 20
+
+      - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      
+          node-version: '24'
+
       - name: Install dependencies
         run: npm install
         working-directory: ./backend
-      
+
       - name: Lint
         run: npm run lint || echo "No lint script or lint step skipped"
         working-directory: ./backend
-      
+
       - name: Build
         run: npm run build
         working-directory: ./backend
-      
+
       - name: Test
         run: npm test
         working-directory: ./backend

@@ -7,6 +7,7 @@ export interface User {
   email: string;
   first_name?: string;
   last_name?: string;
+  gstn?: string;           // GSTN if registered; undefined for non-GSTN firms
   email_verified: boolean;
   trust_level?: 'new' | 'verified' | 'trusted' | 'moderator' | 'admin';
 }
