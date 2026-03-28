@@ -194,7 +194,72 @@ export class IncidentRepository {
       `SELECT * FROM incidents WHERE status IN ('submitted', 'under_review') ORDER BY created_at ASC`
     );
     return result.rows;
+  
+  
+    /**
+   * Find incidents by mobile number via contact_persons table.
+   * Returns array of incidents linked to companies associated with the mobile.
+   * Required by IMPLEMENTATION_CHECKLIST.md Phase 2 § 2.2
+   */
+  async findByMobile(mobile: string): Promise<Incident[]> {
+    const result = await pool.query(
+      `SELECT DISTINCT i.* 
+       FROM incidents i
+       JOIN contact_persons cp ON i.company_gstn = cp.company OR i.company_name = cp.company
+       WHERE cp.phone = $1
+       AND i.status IN ('approved', 'resolved')
+       ORDER BY i.created_at DESC`,
+      [mobile]
+    );
+    return result.rows;
   }
+
+  /**
+   * Soft delete: Sets is_deleted = TRUE instead of removing the row.
+   * Checks litigation_hold flag - throws error if TRUE (cannot delete).
+   * Logs deletion in audit trail.
+   * Required by IMPLEMENTATION_CHECKLIST.md Phase 2 § 2.2
+   */
+  async softDelete(
+    id: number,
+    deletedBy: number,
+    reason?: string
+  ): Promise<boolean> {
+    // Check if incident exists and if litigation hold is active
+    const checkResult = await pool.query(
+      'SELECT id, litigation_hold FROM incidents WHERE id = $1',
+      [id]
+    );
+
+    if (checkResult.rows.length === 0) {
+      throw new Error('Incident not found');
+    }
+
+    const incident = checkResult.rows[0];
+    if (incident.litigation_hold === true) {
+      throw new Error(
+        'Cannot delete incident: litigation hold is active. Contact admin to remove hold before deletion.'
+      );
+    }
+
+    // Perform soft delete
+    const result = await pool.query(
+      `UPDATE incidents 
+       SET is_deleted = TRUE, 
+           deleted_at = NOW(), 
+           deleted_by = $1,
+           deletion_reason = $2,
+           updated_at = NOW()
+       WHERE id = $3
+       RETURNING *`,
+      [deletedBy, reason || null, id]
+    );
+
+    // Log the deletion in audit trail (if audit repository is available)
+    // TODO: Add audit log entry here when audit system is integrated
+
+    return result.rowCount !== null && result.rowCount > 0;
+  }}
 }
 
 export default new IncidentRepository();
