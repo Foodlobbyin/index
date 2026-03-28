@@ -29,6 +29,19 @@ export class ContactPersonRepository {
     const result = await pool.query('DELETE FROM contact_persons WHERE id = $1', [id]);
     return (result.rowCount ?? 0) > 0;
   }
+
+    /**
+   * Find all companies associated with a mobile number.
+   * Returns array of company names/GSTNs.
+   * Required by IMPLEMENTATION_CHECKLIST.md Phase 2 § 2.2
+   */
+  async findCompaniesByMobile(mobile: string): Promise<string[]> {
+    const result = await pool.query(
+      'SELECT DISTINCT company FROM contact_persons WHERE phone = $1 ORDER BY company',
+      [mobile]
+    );
+    return result.rows.map((row) => row.company);
+  }
 }
 
 export default new ContactPersonRepository();
