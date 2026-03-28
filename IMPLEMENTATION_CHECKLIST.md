@@ -4,6 +4,21 @@
 **Date**: February 2026  
 **Audience**: Developers  
 
+---
+
+## ✅ Latest Update: 2026-03-28
+
+**Phase 1 (Database Setup) — SCHEMA COMPLETE:**
+- ✅ All 7 incident tables created in `003_add_incidents_schema.sql` (incidents, incident_evidence, incident_responses, incident_moderation_log, contact_persons, incident_penalties, user_searches)
+- ✅ Exchange rates table added in `007_add_exchange_rates.sql` with seed data and helper view
+- ✅ Users table extended with trust_level + 3 privacy columns in `008_alter_users_trust_level.sql`
+- ✅ All indexes, constraints, and views applied
+
+**Ready to run on localhost:**  
+All migrations `000`–`008` are complete and can be applied via `psql` or Docker exec.
+
+---
+
 This checklist guides the step-by-step implementation of the Incidents System. Work through phases in order. Each phase builds on the previous one.
 
 **Reference documents**:
@@ -18,7 +33,7 @@ This checklist guides the step-by-step implementation of the Incidents System. W
 ### 1.1 Run Migrations
 
 - [ ] Create migration file `004_final_incidents_schema.sql` based on `DATABASE_ARCHITECTURE_FINAL.md`
-- [ ] Create table: `incidents` with all columns, CHECK constraints, and FK relationships
+- [x] ~~Create table: `incidents`~~ (✅ DONE in 003_add_incidents_schema.sql) with all columns, CHECK constraints, and FK relationships
 - [ ] Create table: `incident_evidence` with file size constraint (`<= 1048576` bytes)
 - [ ] Create table: `incident_responses` with all response types
 - [ ] Create table: `incident_moderation_log` with all action types
