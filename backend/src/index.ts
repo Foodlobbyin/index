@@ -11,6 +11,7 @@ import incidentRoutes from './routes/incident.routes';
 import moderationRoutes from './routes/moderation.routes';
 import reputationRoutes from './routes/reputation.routes';
 import auditLogRoutes from './routes/auditLog.routes';
+import adminRoutes from './routes/admin.routes';
 import healthRoutes from './routes/health';
 import { apiLimiter } from './middleware/rateLimiter';
 import { setupSwagger } from './config/swagger';
@@ -94,6 +95,7 @@ app.use('/api/incidents', incidentRoutes);
 app.use('/api/moderation', moderationRoutes);
 app.use('/api/reputation', reputationRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 handler
 app.use((req, res) => {

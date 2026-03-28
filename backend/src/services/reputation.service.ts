@@ -10,12 +10,51 @@ const INCIDENT_WEIGHTS: Record<string, number> = {
   OTHER: 5,
 };
 
+/**
+ * Returns a recency decay multiplier based on how old an incident is.
+ *
+ * - Last 6 months  → 1.00 (full weight)
+ * - 6–12 months    → 0.75
+ * - 1–2 years      → 0.50
+ * - Older than 2 years → 0.25
+ */
+export function getRecencyDecay(incidentDate: Date): number {
+  const now = new Date();
+  const ageMs = now.getTime() - incidentDate.getTime();
+  const ageMonths = ageMs / (1000 * 60 * 60 * 24 * 30.44); // average days/month
+
+  if (ageMonths <= 6) return 1.0;
+  if (ageMonths <= 12) return 0.75;
+  if (ageMonths <= 24) return 0.5;
+  return 0.25;
+}
+
 class ReputationService {
+  /**
+   * Calculate reputation score from incident type counts alone (no date info).
+   * Kept for backward-compatibility with tests that pass aggregate counts.
+   */
   calculateScore(counts: { incident_type: string; count: number }[]): number {
     let score = 100;
     for (const { incident_type, count } of counts) {
       const weight = INCIDENT_WEIGHTS[incident_type] ?? 0;
       score -= weight * count;
+    }
+    return Math.max(0, Math.min(100, score));
+  }
+
+  /**
+   * Calculate reputation score with recency decay applied per incident.
+   * Each incident's weight is multiplied by its decay factor before deduction.
+   */
+  calculateScoreWithDecay(
+    incidents: { incident_type: string; created_at: Date }[]
+  ): number {
+    let score = 100;
+    for (const incident of incidents) {
+      const weight = INCIDENT_WEIGHTS[incident.incident_type] ?? 0;
+      const decay = getRecencyDecay(incident.created_at);
+      score -= weight * decay;
     }
     return Math.max(0, Math.min(100, score));
   }
@@ -59,9 +98,23 @@ class ReputationService {
     };
   }
 
+  /**
+   * Recalculate reputation score for a company using per-incident recency decay,
+   * then persist the result.
+   */
   async recalculateAndPersist(gstn: string): Promise<number> {
-    const counts = await reputationRepository.getIncidentCountsByGstn(gstn);
-    const score = this.calculateScore(counts);
+    // Try to get per-incident data for decay-aware calculation
+    const incidents = await reputationRepository.getIncidentsWithDatesByGstn(gstn);
+
+    let score: number;
+    if (incidents.length > 0) {
+      score = this.calculateScoreWithDecay(incidents);
+    } else {
+      // Fallback: use aggregate counts (no date info available)
+      const counts = await reputationRepository.getIncidentCountsByGstn(gstn);
+      score = this.calculateScore(counts);
+    }
+
     await reputationRepository.updateScoreByGstn(gstn, score);
     return score;
   }

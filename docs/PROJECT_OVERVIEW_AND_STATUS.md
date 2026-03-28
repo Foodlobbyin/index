@@ -1,10 +1,8 @@
 # Project Overview and Status
 
-Last updated: 14 March 2026
+Last updated: 28 March 2026
 
 ## Overview
-
-This document consolidates all major project elements, summarising the current status, roadmap, and next steps. It is updated after each milestone.
 
 **Foodlobbyin Index** is a B2B vendor intelligence platform for the food and spice industry. It enables users to report vendor incidents, attach evidence, track moderation decisions, view vendor reputation scores, and search the audit log. Access to sensitive features is governed by a 5-tier trust level system.
 
@@ -12,63 +10,51 @@ This document consolidates all major project elements, summarising the current s
 
 ## Current Status
 
-All originally planned features and the first phase of RBAC are now built, tested, and merged:
+**Overall Completion: ~90%** — All core features, security layers, and the CI/CD pipeline are built and merged. The only remaining steps before production deployment are database migration execution, admin account bootstrap, and a final smoke test.
 
-- **Incident handling** — Users can report and track vendor incidents.
-- **Evidence tracking** — Supporting documents and evidence can be attached to incidents.
-- **Moderation features** — Moderators can review, approve, and act on reported incidents.
-- **Reputation system** — Vendor reputation scores are calculated using a weighted scoring model (FRAUD: 30pts, CONTRACT_BREACH: 25pts, PAYMENT_ISSUE: 20pts, QUALITY_ISSUE: 15pts, SERVICE_ISSUE: 10pts, OTHER: 5pts). Scores are stored in the database and displayed on company profiles.
-- **Audit log search** — Administrators can search and filter the audit log by incident, moderator, action type, and date range via a dedicated UI tab.
-- **Rate limiter** — All API routes are protected by a rate limiter.
-- **Frontend shell** — Audit Log tab, Reputation Score card, and improved error messaging are all in place.
-- **Role-based access control (RBAC) — Phase 1 complete** — A 5-tier `trust_level` system (`new`, `verified`, `trusted`, `moderator`, `admin`) is implemented end-to-end:
-  - Database: `trust_level` column added via migration `006_add_trust_level_to_users.sql` with CHECK constraint and index.
-  - Backend: `trust_level` is included in the JWT payload. `requireTrustLevel` middleware is created and applied to audit log routes.
-  - Frontend: `AppShell.tsx` reads `user.trust_level` from auth context and conditionally renders the Audit Logs tab only for `moderator` and `admin` users.
-- **Unit tests** — Comprehensive tests exist for all services: reputation, audit log, auth, moderation, incident, GSTN, OTP, referral, and validation.
+### What is built and working
+
+- **Incident handling** — Report, track, and manage vendor incidents end-to-end.
+- **Evidence tracking** — Attach supporting documents to incidents (max 3 files, 1 MB each).
+- **Moderation features** — Moderator queue, approve/reject with reason, penalty tracking. All routes protected by `requireMinTrustLevel('moderator')`.
+- **Reputation system** — Weighted scoring by incident type with recency decay (full weight within 6 months, tapering to 25% for incidents older than 2 years). Scores persisted in the database and shown on company profiles.
+- **Audit log search** — Filter by incident, moderator, action type, and date range. Tab visible only to moderator/admin.
+- **Rate limiter** — All API routes protected. Search rate limiting enforced.
+- **RBAC — Complete** — 5-tier `trust_level` system (`new`, `verified`, `trusted`, `moderator`, `admin`) implemented end-to-end:
+  - Database: `trust_level` column + CHECK constraint + index (migration 006).
+  - Backend: `trust_level` in JWT payload; `requireTrustLevel` and `requireMinTrustLevel` middleware on all sensitive routes.
+  - Frontend: Audit Logs tab and Moderation link conditionally rendered for moderator/admin only (in both `AppShell.tsx` and `Navigation.tsx`).
+- **Admin trust-level management API** — `PUT /api/admin/users/:id/trust-level` (admin only). `GET /api/admin/users/promotion-candidates` (moderator/admin).
+- **Unit tests** — Full coverage across all services: reputation (including recency decay), audit log, auth, moderation, incident, GSTN, OTP, referral, validation.
+- **CI/CD pipeline** — GitHub Actions workflow runs lint + build + tests against PostgreSQL 15 on every push and PR.
 
 ---
 
-## Needs Attention
+## What Needs to Happen Before Production
 
-The following must be resolved before the platform goes to production:
-
-- **Moderation routes unprotected** — `moderation.routes.ts` uses only `authMiddleware` but does NOT apply `requireTrustLevel`. Any logged-in user can call approve, reject, and penalty endpoints. This is the single most critical security gap remaining.
-- **No admin UI for trust level management** — Admin and moderator accounts must currently be promoted manually via raw SQL after running migration 006. An API endpoint is needed.
-- **Audit Logs missing from main navigation** — `Navigation.tsx` does not include a conditional link to the Audit Logs page for moderator/admin users.
+| Step | What | How |
+|------|------|-----|
+| 1 | Run DB migrations 000–009 | `docker exec` into the DB container and apply each SQL file in `infrastructure/database/migrations/` |
+| 2 | Bootstrap admin account | `UPDATE users SET trust_level = 'admin' WHERE username = 'your_username';` |
+| 3 | Smoke test | Follow [NEXT_STEPS.md](./NEXT_STEPS.md) — register, log in, submit incident, approve as moderator, search, verify result |
+| 4 | Production config | Docker + Nginx + PM2 + HTTPS + environment variables for production |
+| 5 | Legal docs | Terms of Service and Privacy Policy before public-facing launch |
 
 ---
 
 ## Roadmap
 
-### Immediate (Security — do before any production deployment)
-
-- Apply `requireTrustLevel('moderator', 'admin')` to all routes in `moderation.routes.ts`.
-- Run migration `006_add_trust_level_to_users.sql` against the production database.
-- Bootstrap at least one admin account via SQL.
-
-### Short-term
-
-- Add conditional Audit Logs link in `Navigation.tsx`.
-- Create `PUT /api/admin/users/:id/trust-level` endpoint for user promotion/demotion.
-- Run end-to-end smoke test (register → login → create company → add invoice → view insights → audit log as moderator → logout).
-
-### Medium-term
-
-- Add recency decay to reputation scoring (incidents older than 1 year count at reduced weight).
-- Improve incident frontend pages with filtering, status timeline, and bulk moderation.
-- Set up GitHub Actions CI/CD pipeline.
+See [ROADMAP.md](./ROADMAP.md) for the full feature roadmap and upcoming enhancements.
 
 ---
 
 ## Next Steps
 
-1. Fix moderation route security (add `requireTrustLevel`).
-2. Run database migration 006 and set admin account.
-3. Add Audit Logs nav link for privileged users.
-4. Build admin trust-level management endpoint.
-5. Run full smoke test.
+1. Run database migrations and set admin account.
+2. Run full smoke test.
+3. Set up production environment.
+4. Draft legal documents.
+5. Begin beta user recruitment.
 
-For the full feature roadmap, see [ROADMAP.md](./ROADMAP.md).
-For practical guidance on what to work on next, see [NEXT_STEPS.md](./NEXT_STEPS.md).
-For a quick-reference task checklist for the project owner, see [TASK_REFERENCE.md](./TASK_REFERENCE.md).
+For practical guidance, see [NEXT_STEPS.md](./NEXT_STEPS.md).  
+For a quick-reference task checklist, see [TASK_REFERENCE.md](./TASK_REFERENCE.md).

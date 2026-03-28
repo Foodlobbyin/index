@@ -39,6 +39,23 @@ class ReputationRepository {
       [score, gstn]
     );
   }
+
+  /**
+   * Fetch individual approved/resolved incidents with their creation date,
+   * used for recency-decay score calculation.
+   */
+  async getIncidentsWithDatesByGstn(
+    gstn: string
+  ): Promise<{ incident_type: string; created_at: Date }[]> {
+    const result = await pool.query(
+      `SELECT incident_type, created_at
+       FROM incidents
+       WHERE company_gstn = $1 AND status IN ('approved', 'resolved')
+       ORDER BY created_at DESC`,
+      [gstn]
+    );
+    return result.rows;
+  }
 }
 
 export default new ReputationRepository();

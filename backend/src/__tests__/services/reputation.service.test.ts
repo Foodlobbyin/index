@@ -1,4 +1,4 @@
-import reputationService from '../../services/reputation.service';
+import reputationService, { getRecencyDecay } from '../../services/reputation.service';
 import reputationRepository from '../../repositories/reputation.repository';
 
 jest.mock('../../repositories/reputation.repository');
@@ -77,6 +77,64 @@ describe('ReputationService', () => {
       expect(result.total_incidents).toBe(3);
       expect(result.breakdown.FRAUD).toBe(1);
       expect(result.breakdown.QUALITY_ISSUE).toBe(2);
+    });
+  });
+
+  describe('getRecencyDecay', () => {
+    const monthsAgo = (months: number): Date => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - months);
+      return d;
+    };
+
+    it('returns 1.0 for incidents within the last 6 months', () => {
+      expect(getRecencyDecay(monthsAgo(1))).toBe(1.0);
+      expect(getRecencyDecay(monthsAgo(5))).toBe(1.0);
+    });
+
+    it('returns 0.75 for incidents 6–12 months old', () => {
+      expect(getRecencyDecay(monthsAgo(7))).toBe(0.75);
+      expect(getRecencyDecay(monthsAgo(11))).toBe(0.75);
+    });
+
+    it('returns 0.5 for incidents 1–2 years old', () => {
+      expect(getRecencyDecay(monthsAgo(14))).toBe(0.5);
+      expect(getRecencyDecay(monthsAgo(23))).toBe(0.5);
+    });
+
+    it('returns 0.25 for incidents older than 2 years', () => {
+      expect(getRecencyDecay(monthsAgo(30))).toBe(0.25);
+    });
+  });
+
+  describe('calculateScoreWithDecay', () => {
+    const monthsAgo = (months: number): Date => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - months);
+      return d;
+    };
+
+    it('applies full weight to recent incidents', () => {
+      const incidents = [{ incident_type: 'FRAUD', created_at: monthsAgo(1) }];
+      // FRAUD weight 30 × decay 1.0 = 30 deducted → score 70
+      expect(reputationService.calculateScoreWithDecay(incidents)).toBe(70);
+    });
+
+    it('applies 0.75 decay to incidents 7 months old', () => {
+      const incidents = [{ incident_type: 'FRAUD', created_at: monthsAgo(7) }];
+      // 30 × 0.75 = 22.5 deducted → 77.5
+      expect(reputationService.calculateScoreWithDecay(incidents)).toBeCloseTo(77.5);
+    });
+
+    it('applies 0.25 decay to incidents older than 2 years', () => {
+      const incidents = [{ incident_type: 'FRAUD', created_at: monthsAgo(30) }];
+      // 30 × 0.25 = 7.5 deducted → 92.5
+      expect(reputationService.calculateScoreWithDecay(incidents)).toBeCloseTo(92.5);
+    });
+
+    it('clamps score to 0 when deductions exceed 100', () => {
+      const incidents = Array(10).fill({ incident_type: 'FRAUD', created_at: monthsAgo(1) });
+      expect(reputationService.calculateScoreWithDecay(incidents)).toBe(0);
     });
   });
 });
