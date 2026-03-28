@@ -16,6 +16,8 @@ jest.mock('../../services/email.service');
 describe('OTPService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default: no recent IP-based attempts (overridden per-test where needed)
+    (attemptRepository.getRecentOTPAttemptsByIP as jest.Mock).mockResolvedValue([]);
   });
 
   describe('generateAndSendOTP', () => {

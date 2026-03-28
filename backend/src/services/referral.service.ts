@@ -13,7 +13,7 @@ export class ReferralService {
    */
   async createReferralCode(input: ReferralCreateInput) {
     // Validate max_uses
-    if (input.max_uses && input.max_uses < 1) {
+    if (input.max_uses !== undefined && input.max_uses < 1) {
       throw new Error('max_uses must be at least 1');
     }
 

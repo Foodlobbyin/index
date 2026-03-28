@@ -138,7 +138,7 @@ describe('ValidationService', () => {
     it('should accept strong passwords', () => {
       const strongPasswords = [
         'MyP@ssw0rd!',
-        'Secure#Pass123',
+        'Secure#Pass7!x',
         'C0mplex!ty99',
       ];
 
