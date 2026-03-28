@@ -3,44 +3,67 @@ import { ContactPerson, ContactPersonCreateInput } from '../models/ContactPerson
 
 export class ContactPersonRepository {
   async create(data: ContactPersonCreateInput): Promise<ContactPerson> {
-    const { company_gstn, contact_name, contact_email, contact_phone, designation, is_primary = false } = data;
+    const { name, email, phone, company } = data;
     const result = await pool.query(
-      `INSERT INTO contact_persons (company_gstn, contact_name, contact_email, contact_phone, designation, is_primary)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [company_gstn, contact_name, contact_email || null, contact_phone || null, designation || null, is_primary]
+      `INSERT INTO contact_persons (name, email, phone, company)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [name, email, phone ?? null, company ?? null]
     );
     return result.rows[0];
   }
 
-  async findByGstn(gstn: string): Promise<ContactPerson[]> {
+  async findById(id: number): Promise<ContactPerson | null> {
     const result = await pool.query(
-      'SELECT * FROM contact_persons WHERE company_gstn = $1 ORDER BY is_primary DESC, created_at ASC',
-      [gstn]
+      'SELECT * FROM contact_persons WHERE id = $1',
+      [id]
+    );
+    return result.rows[0] || null;
+  }
+
+  /**
+   * Find all contact_persons rows that match the given phone number.
+   * Returns every row — a person can be linked to multiple companies.
+   */
+  async findByPhone(phone: string): Promise<ContactPerson[]> {
+    const result = await pool.query(
+      `SELECT * FROM contact_persons
+       WHERE phone = $1
+       ORDER BY created_at ASC`,
+      [phone]
     );
     return result.rows;
   }
 
-  async findById(id: number): Promise<ContactPerson | null> {
-    const result = await pool.query('SELECT * FROM contact_persons WHERE id = $1', [id]);
-    return result.rows[0] || null;
+  /**
+   * Return the distinct company names associated with a phone number.
+   * Filters out nulls and empty strings.
+   */
+  async findCompaniesByPhone(phone: string): Promise<string[]> {
+    const result = await pool.query(
+      `SELECT DISTINCT company
+       FROM contact_persons
+       WHERE phone = $1
+         AND company IS NOT NULL
+         AND company <> ''
+       ORDER BY company`,
+      [phone]
+    );
+    return result.rows.map((r: { company: string }) => r.company);
+  }
+
+  /**
+   * @deprecated alias kept for call-sites that still use "mobile" terminology.
+   */
+  async findCompaniesByMobile(mobile: string): Promise<string[]> {
+    return this.findCompaniesByPhone(mobile);
   }
 
   async delete(id: number): Promise<boolean> {
-    const result = await pool.query('DELETE FROM contact_persons WHERE id = $1', [id]);
-    return (result.rowCount ?? 0) > 0;
-  }
-
-    /**
-   * Find all companies associated with a mobile number.
-   * Returns array of company names/GSTNs.
-   * Required by IMPLEMENTATION_CHECKLIST.md Phase 2 § 2.2
-   */
-  async findCompaniesByMobile(mobile: string): Promise<string[]> {
     const result = await pool.query(
-      'SELECT DISTINCT company FROM contact_persons WHERE phone = $1 ORDER BY company',
-      [mobile]
+      'DELETE FROM contact_persons WHERE id = $1',
+      [id]
     );
-    return result.rows.map((row) => row.company);
+    return (result.rowCount ?? 0) > 0;
   }
 }
 

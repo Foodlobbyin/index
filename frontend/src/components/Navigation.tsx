@@ -1,8 +1,13 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/authService';
 
 export default function Navigation(): JSX.Element {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const canSeeAuditLogs =
+    user?.trust_level === 'moderator' || user?.trust_level === 'admin';
 
   const handleLogout = () => {
     authService.logout();
@@ -46,6 +51,9 @@ export default function Navigation(): JSX.Element {
           <Link to="/company" style={linkStyle}>Company</Link>
           <Link to="/app/invoices" style={linkStyle}>Invoices</Link>
           <Link to="/insights" style={linkStyle}>Insights</Link>
+          {canSeeAuditLogs && (
+            <Link to="/app" style={linkStyle}>Audit Logs</Link>
+          )}
         </div>
       </div>
       <button onClick={handleLogout} style={buttonStyle}>Logout</button>

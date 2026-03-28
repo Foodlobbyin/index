@@ -1,6 +1,7 @@
 import { ReputationScore, IncidentTypeBreakdown } from '../models/Reputation';
 import reputationRepository from '../repositories/reputation.repository';
 
+// ─── Weights ──────────────────────────────────────────────────────────────────
 const INCIDENT_WEIGHTS: Record<string, number> = {
   FRAUD: 30,
   CONTRACT_BREACH: 25,
@@ -10,14 +11,65 @@ const INCIDENT_WEIGHTS: Record<string, number> = {
   OTHER: 5,
 };
 
+// ─── Recency decay ────────────────────────────────────────────────────────────
+/**
+ * Older incidents carry less weight:
+ *   ≤ 6 months  → 1.00 (full)
+ *   6–12 months → 0.75
+ *   1–2 years   → 0.50
+ *   > 2 years   → 0.25
+ */
+export function getRecencyDecay(incidentDate: Date): number {
+  const ageMonths =
+    (Date.now() - incidentDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
+  if (ageMonths <= 6)  return 1.00;
+  if (ageMonths <= 12) return 0.75;
+  if (ageMonths <= 24) return 0.50;
+  return 0.25;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function emptyBreakdown(): IncidentTypeBreakdown {
+  return { FRAUD: 0, CONTRACT_BREACH: 0, PAYMENT_ISSUE: 0, QUALITY_ISSUE: 0, SERVICE_ISSUE: 0, OTHER: 0 };
+}
+
+function scoreFromIncidents(
+  incidents: { incident_type: string; created_at: Date }[]
+): { score: number; breakdown: IncidentTypeBreakdown; total: number } {
+  const breakdown = emptyBreakdown();
+  let score = 100;
+
+  for (const { incident_type, created_at } of incidents) {
+    const weight = INCIDENT_WEIGHTS[incident_type] ?? 0;
+    score -= weight * getRecencyDecay(created_at);
+    if (incident_type in breakdown) {
+      breakdown[incident_type as keyof IncidentTypeBreakdown]++;
+    }
+  }
+
+  return {
+    score: Math.max(0, Math.min(100, score)),
+    breakdown,
+    total: incidents.length,
+  };
+}
+
 class ReputationService {
+
+  // ─── Public scoring helpers (used by tests) ───────────────────────────────
+
   calculateScore(counts: { incident_type: string; count: number }[]): number {
     let score = 100;
     for (const { incident_type, count } of counts) {
-      const weight = INCIDENT_WEIGHTS[incident_type] ?? 0;
-      score -= weight * count;
+      score -= (INCIDENT_WEIGHTS[incident_type] ?? 0) * count;
     }
     return Math.max(0, Math.min(100, score));
+  }
+
+  calculateScoreWithDecay(
+    incidents: { incident_type: string; created_at: Date }[]
+  ): number {
+    return scoreFromIncidents(incidents).score;
   }
 
   getLabel(score: number): 'Excellent' | 'Good' | 'Fair' | 'Poor' {
@@ -27,43 +79,103 @@ class ReputationService {
     return 'Poor';
   }
 
-  async getReputationSummary(gstn: string): Promise<ReputationScore> {
-    const counts = await reputationRepository.getIncidentCountsByGstn(gstn);
-    const companyName = await reputationRepository.getCompanyNameByGstn(gstn);
-    const score = this.calculateScore(counts);
-    const label = this.getLabel(score);
+  // ─── Path 1: Lookup by GSTN ───────────────────────────────────────────────
 
-    const breakdown: IncidentTypeBreakdown = {
-      FRAUD: 0,
-      CONTRACT_BREACH: 0,
-      PAYMENT_ISSUE: 0,
-      QUALITY_ISSUE: 0,
-      SERVICE_ISSUE: 0,
-      OTHER: 0,
-    };
-    let total_incidents = 0;
-    for (const { incident_type, count } of counts) {
-      if (incident_type in breakdown) {
-        breakdown[incident_type as keyof IncidentTypeBreakdown] = count;
-      }
-      total_incidents += count;
-    }
+  async getReputationByGstn(gstn: string): Promise<ReputationScore> {
+    const incidents = await reputationRepository.getIncidentsWithDatesByGstn(gstn);
+    const companyName = await reputationRepository.getCompanyNameByGstn(gstn);
+    const { score, breakdown, total } = scoreFromIncidents(incidents);
 
     return {
       company_gstn: gstn,
       company_name: companyName ?? gstn,
       reputation_score: score,
-      label,
-      total_incidents,
+      label: this.getLabel(score),
+      total_incidents: total,
       breakdown,
     };
   }
 
-  async recalculateAndPersist(gstn: string): Promise<number> {
-    const counts = await reputationRepository.getIncidentCountsByGstn(gstn);
-    const score = this.calculateScore(counts);
+  async recalculateAndPersistByGstn(gstn: string): Promise<number> {
+    const incidents = await reputationRepository.getIncidentsWithDatesByGstn(gstn);
+    const score = scoreFromIncidents(incidents).score;
     await reputationRepository.updateScoreByGstn(gstn, score);
     return score;
+  }
+
+  // ─── Path 2: Lookup by mobile / phone ────────────────────────────────────
+  /**
+   * Resolves a phone number to one or more company names, then calculates
+   * the reputation for each company found.
+   *
+   * Resolution order:
+   *  1. contact_persons table — phone → company name (works for ALL firms,
+   *     GSTN-registered or not)
+   *  2. users + company_profiles — mobile_number / phone_number → company name
+   *     (catches users who registered their own number)
+   *
+   * Returns an array because one person can be linked to multiple firms.
+   */
+  async getReputationByPhone(phone: string): Promise<ReputationScore[]> {
+    // Step 1: collect company names from both sources
+    const namesFromContacts =
+      await reputationRepository.getCompanyNamesByPhone(phone);
+
+    const nameFromUserProfile =
+      await reputationRepository.getCompanyNameByUserPhone(phone);
+
+    // Deduplicate (case-insensitive)
+    const seen = new Set<string>();
+    const companyNames: string[] = [];
+
+    for (const name of [...namesFromContacts, ...(nameFromUserProfile ? [nameFromUserProfile] : [])]) {
+      const key = name.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        companyNames.push(name);
+      }
+    }
+
+    if (companyNames.length === 0) {
+      return []; // phone number not found in any source
+    }
+
+    // Step 2: for each company, fetch incidents and score
+    const results: ReputationScore[] = [];
+
+    for (const companyName of companyNames) {
+      const incidents =
+        await reputationRepository.getIncidentsWithDatesByCompanyName(companyName);
+
+      const { score, breakdown, total } = scoreFromIncidents(incidents);
+
+      // Pick up GSTN if the incidents carry one (GSTN-registered firm found via mobile)
+      const gstn =
+        incidents.find((i) => i.company_gstn)?.company_gstn ?? null;
+
+      results.push({
+        company_gstn: gstn,
+        company_name: companyName,
+        reputation_score: score,
+        label: this.getLabel(score),
+        total_incidents: total,
+        breakdown,
+      });
+    }
+
+    return results;
+  }
+
+  // ─── Backward-compat aliases ──────────────────────────────────────────────
+
+  /** @deprecated use getReputationByGstn */
+  async getReputationSummary(gstn: string): Promise<ReputationScore> {
+    return this.getReputationByGstn(gstn);
+  }
+
+  /** @deprecated use recalculateAndPersistByGstn */
+  async recalculateAndPersist(gstn: string): Promise<number> {
+    return this.recalculateAndPersistByGstn(gstn);
   }
 }
 

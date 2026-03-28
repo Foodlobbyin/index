@@ -9,6 +9,9 @@ import Homepage from './pages/Homepage';
 import NewsPage from './pages/NewsPage';
 import PublicLayout from './components/PublicLayout';
 import AppShell from './pages/AppShell';
+import Dashboard from './pages/Dashboard';
+import CompanyProfile from './pages/CompanyProfile';
+import InsightsPage from './pages/InsightsPage';
 import InvoiceList from './pages/InvoiceList';
 import InvoiceCreatePage from './pages/InvoiceCreatePage';
 import InvoiceDetailPage from './pages/InvoiceDetailPage';
@@ -30,6 +33,32 @@ export default function App(): JSX.Element {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
+
+          {/* Protected standalone pages (linked from Dashboard) */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/company"
+            element={
+              <ProtectedRoute>
+                <CompanyProfile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/insights"
+            element={
+              <ProtectedRoute>
+                <InsightsPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Protected invoice routes */}
           <Route

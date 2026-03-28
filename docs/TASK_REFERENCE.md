@@ -1,9 +1,9 @@
 # Task Reference — Foodlobbyin Index
 
-> **Owner's master reference document.**
+> **Owner's master reference document.**  
 > This file is your single source of truth for the current state of the project and what needs to be done. Update the checkboxes as you complete each task.
 
-Last updated: 14 March 2026
+Last updated: 28 March 2026
 
 ---
 
@@ -12,210 +12,148 @@ Last updated: 14 March 2026
 | Area | Status |
 |---|---|
 | Core features (incidents, evidence, moderation) | ✅ Complete |
-| Reputation system (weighted by severity) | ✅ Complete |
+| Reputation system (weighted by severity + recency decay) | ✅ Complete |
 | Audit log search UI | ✅ Complete |
 | Rate limiting on all API routes | ✅ Complete |
 | RBAC — DB schema (trust_level column) | ✅ Complete |
 | RBAC — JWT includes trust_level | ✅ Complete |
-| RBAC — requireTrustLevel middleware | ✅ Complete |
+| RBAC — requireTrustLevel / requireMinTrustLevel middleware | ✅ Complete |
 | RBAC — Audit log routes protected | ✅ Complete |
-| RBAC — Frontend hides Audit Logs for regular users | ✅ Complete |
-| Unit tests for all services | ✅ Complete |
-| RBAC — Moderation routes protected | ❌ Not done — CRITICAL |
-| Database migration 006 run on live DB | ❌ Not done — CRITICAL |
-| Admin account bootstrapped | ❌ Not done — CRITICAL |
-| Audit Logs link in Navigation.tsx | ❌ Not done |
-| Admin API for trust level management | ❌ Not done |
-| Recency decay in reputation scoring | ❌ Not done |
-| Incident frontend improvements | ❌ Not done |
-| CI/CD pipeline | ❌ Not done |
-| End-to-end smoke test | ❌ Not done |
+| RBAC — Moderation routes protected | ✅ Complete |
+| RBAC — Frontend hides Audit Logs & Moderation for regular users | ✅ Complete |
+| Navigation.tsx — Audit Logs conditional link | ✅ Complete |
+| Admin API for trust level management | ✅ Complete |
+| Admin API — promotion candidates endpoint | ✅ Complete |
+| Unit tests for all services (incl. recency decay) | ✅ Complete |
+| CI/CD pipeline (GitHub Actions) | ✅ Complete |
+| Database migrations written (000–009) | ✅ Written — needs to be run |
+| Database migrations run on local/production DB | ❌ Must do before launch |
+| Admin account bootstrapped | ❌ Must do before launch |
+| End-to-end smoke test | ❌ Must do before launch |
+| Production deployment config | ❌ Future |
+| Terms of Service and Privacy Policy | ❌ Future |
+| Beta testing program | ❌ Future |
 
 ---
 
 ## CRITICAL — Must do before any production deployment
 
-### Task 1: Protect moderation routes with trust level
+### Task 1: Run database migrations on your database
 
-- [ ] **File to edit:** `backend/src/routes/moderation.routes.ts`
-- [ ] **What to do:**
-  1. Add import at top: `import { requireTrustLevel } from '../middleware/trustLevel.middleware';`
-  2. Add `requireTrustLevel('moderator', 'admin')` as middleware to these 4 routes:
-     - `router.get('/queue', ...)`
-     - `router.put('/incidents/:id/approve', ...)`
-     - `router.put('/incidents/:id/reject', ...)`
-     - `router.post('/incidents/:id/penalty', ...)`
-- [ ] **Why:** Any logged-in user can currently call these endpoints. This is the biggest security gap.
-- [ ] **Effort:** 30 minutes
-- [ ] **Test by:** Using a `new`-level user's JWT to call `GET /api/moderation/queue` — should get 403 after the fix.
-
----
-
-### Task 2: Run database migration 006
-
-- [ ] **File to run:** `infrastructure/database/migrations/006_add_trust_level_to_users.sql`
-- [ ] **What to do:**
-  1. Connect to the PostgreSQL database (use `docker exec` or a DB client).
-  2. Run the SQL file against the database.
-  3. Verify the `trust_level` column was added: `SELECT trust_level FROM users LIMIT 5;`
-- [ ] **Effort:** 15 minutes
+- [ ] **Files to run (in order):** `infrastructure/database/migrations/000_*.sql` → `001` → … → `009`
+- [ ] **How:**
+  1. Start Docker: `docker-compose up -d` from the `infrastructure/` folder.
+  2. Connect to the database:
+     ```
+     docker exec -it foodlobbyin_db psql -U postgres -d foodlobbyin
+     ```
+  3. Run each migration file:
+     ```
+     \i /migrations/006_add_trust_level_to_users.sql
+     ```
+  4. Verify: `SELECT trust_level FROM users LIMIT 5;`
+- **Effort:** 30 minutes
 
 ---
 
-### Task 3: Bootstrap admin account
+### Task 2: Bootstrap admin account
 
-- [ ] **What to do:** After running migration 006, set your own account as admin:
+- [ ] After running migration 006, promote your own account:
   ```sql
   UPDATE users SET trust_level = 'admin' WHERE username = 'your_username';
   ```
-  And set your moderator account(s):
+- [ ] Optionally set a moderator account:
   ```sql
   UPDATE users SET trust_level = 'moderator' WHERE username = 'moderator_username';
   ```
-- [ ] **Why:** Without an admin account, no one can access the Audit Logs tab or moderate incidents.
-- [ ] **Effort:** 5 minutes
+- **Effort:** 5 minutes
 
 ---
 
-## HIGH PRIORITY — Do before beta launch
+### Task 3: Run end-to-end smoke test
 
-### Task 4: Add Audit Logs link to main navigation
-
-- [ ] **File to edit:** `frontend/src/components/Navigation.tsx`
-- [ ] **What to do:**
-  1. Import `useAuth`: `import { useAuth } from '../contexts/AuthContext';`
-  2. Inside the component, add: `const { user } = useAuth();`
-  3. Add constant: `const canSeeAuditLogs = ['moderator', 'admin'].includes(user?.trust_level);`
-  4. In the JSX nav links, add: `{canSeeAuditLogs && <Link to="/audit-logs">Audit Logs</Link>}`
-- [ ] **Effort:** 1 hour
-- [ ] **Test by:** Logging in as `moderator`/`admin` — link should appear. Logging in as `new` user — link should NOT appear.
-
----
-
-### Task 5: Build admin trust-level management API
-
-- [ ] **New file to create:** `backend/src/routes/admin.routes.ts`
-- [ ] **New file to create:** `backend/src/controllers/admin.controller.ts`
-- [ ] **What to do:**
-  1. Create a `PUT /api/admin/users/:id/trust-level` endpoint.
-  2. Protect with `requireTrustLevel('admin')`.
-  3. Accept `{ trust_level: 'new' | 'verified' | 'trusted' | 'moderator' | 'admin' }` in the body.
-  4. Update the user's `trust_level` in the database.
-  5. Register the route in `backend/src/index.ts`.
-- [ ] **Effort:** 2–3 hours
-
----
-
-### Task 6: Run end-to-end smoke test
-
-- [ ] Start the app locally (`start.bat` on Windows or `./start.sh` on Mac/Linux)
+- [ ] Start the app (`start.bat` on Windows, `./start.sh` on Mac/Linux)
 - [ ] Register a new user account
-- [ ] Log in and create a company profile
-- [ ] Add at least one invoice
-- [ ] View the market insights page
-- [ ] Log out
-- [ ] Set the test account to `moderator` via SQL
-- [ ] Log back in and verify the Audit Logs tab IS visible
-- [ ] Create a new `new`-level user and verify the Audit Logs tab is NOT visible
-- [ ] Try calling `POST /api/moderation/incidents/1/penalty` with a `new`-level JWT — should get 403
-- [ ] Note any errors or broken pages
+- [ ] Log in and submit a test incident
+- [ ] Log in as moderator → approve the incident
+- [ ] Search by GSTN → confirm the incident appears in results
+- [ ] Log in as regular user → confirm Audit Logs and Moderation links are NOT visible
+- [ ] Log in as moderator/admin → confirm both links ARE visible
+- [ ] Call `GET /api/moderation/queue` with a regular user JWT → should return 403
+- [ ] Call `PUT /api/admin/users/:id/trust-level` with a moderator JWT → should return 403
+- [ ] Call `PUT /api/admin/users/:id/trust-level` with an admin JWT → should succeed
+- **Effort:** 2–4 hours
+
+---
+
+## HIGH PRIORITY — Before beta launch
+
+### Task 4: Production environment setup
+
+- [ ] Configure Nginx as a reverse proxy (frontend on port 80, API proxied from `/api/`)
+- [ ] Set up PM2 for Node.js process management (auto-restart on crash)
+- [ ] Create production `.env` files (use `backend/.env.example` as the template)
+- [ ] Enable HTTPS (Let's Encrypt via Certbot)
+- **Effort:** 1–2 days
+
+---
+
+### Task 5: Draft legal documents
+
+- [ ] Terms of Service (`TERMS_OF_SERVICE.md`) — covers user conduct, incident reporting guidelines, IP, disclaimers
+- [ ] Privacy Policy (`PRIVACY_POLICY_DRAFT.md`) — covers data collection, PDPA/IT Act compliance for India, user rights
+- [ ] Get both reviewed by a lawyer before public launch
+- **Effort:** 3–5 days (writing) + legal review time
 
 ---
 
 ## MEDIUM PRIORITY — Quality improvements
 
-### Task 7: Add recency decay to reputation scoring
+### Task 6: Improve incident frontend pages
 
-- [ ] **File to edit:** `backend/src/services/reputation.service.ts`
-- [ ] **What to do:** Apply a time-decay multiplier to incident weights:
-  - Last 6 months: 100% weight (no change)
-  - 6–12 months ago: 75% weight
-  - 1–2 years ago: 50% weight
-  - Older than 2 years: 25% weight
-- [ ] **Also update:** `backend/src/__tests__/services/reputation.service.test.ts` to add test cases for recency decay.
-- [ ] **Effort:** 2 hours
+- [ ] **File:** `frontend/src/pages/IncidentListPage.tsx`
+- [ ] Add status filter (all / pending / approved / rejected / resolved)
+- [ ] Add incident date range filter
+- [ ] Add status timeline component to `IncidentDetailPage.tsx`
+- [ ] Add bulk approve / reject UI to `ModerationQueuePage.tsx` (for moderators)
+- **Effort:** 3–5 days
 
 ---
 
-### Task 8: Improve incident frontend pages
+### Task 7: Set up monitoring and alerting
 
-- [ ] **Files to review/edit:** `frontend/src/pages/` (check for any existing incident pages)
-- [ ] **What to build:**
-  - [ ] Incident list with status filter (pending / approved / rejected)
-  - [ ] Status timeline on incident detail page
-  - [ ] Bulk select + bulk approve/reject for moderators
-- [ ] **Effort:** 3–5 days
+- [ ] Configure uptime monitoring (e.g., UptimeRobot free tier) for `GET /api/health`
+- [ ] Add alert: if a single user performs >500 searches in one day, notify admin
+- [ ] Set up basic error logging (Sentry free tier or server-side log file rotation)
+- **Effort:** 1 day
 
 ---
 
-## LOWER PRIORITY — Infrastructure
+## LOWER PRIORITY — Future enhancements
 
-### Task 9: Set up CI/CD pipeline
+### Task 8: Beta testing program
 
-- [ ] **New file to create:** `.github/workflows/ci.yml`
-- [ ] **What to do:** Create a GitHub Actions workflow:
-  ```yaml
-  name: CI
-  on: [push, pull_request]
-  jobs:
-    test-backend:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v3
-        - uses: actions/setup-node@v3
-          with: { node-version: '18' }
-        - run: cd backend && npm install && npm test
-    test-frontend:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v3
-        - uses: actions/setup-node@v3
-          with: { node-version: '18' }
-        - run: cd frontend && npm install && npm test
-  ```
-- [ ] **Effort:** 2–3 hours
+- [ ] Write recruitment email templates (warm intro, cold outreach, follow-up)
+- [ ] Create `BETA_TESTING_GUIDE.md` with onboarding process and feedback forms
+- [ ] Recruit 10 initial beta users from food/spice industry contacts
+- [ ] Collect structured feedback and iterate
 
 ---
 
-## Quick Reference — Key Files
+### Task 9: Advanced reputation features
 
-| What you want to change | File |
-|---|---|
-| Moderation route security | `backend/src/routes/moderation.routes.ts` |
-| Trust level middleware | `backend/src/middleware/trustLevel.middleware.ts` |
-| Reputation scoring weights | `backend/src/services/reputation.service.ts` |
-| Audit log routes | `backend/src/routes/auditLog.routes.ts` |
-| User model / trust_level type | `backend/src/models/User.ts` |
-| Auth — JWT generation | `backend/src/services/auth.service.ts` |
-| DB migration for trust_level | `infrastructure/database/migrations/006_add_trust_level_to_users.sql` |
-| Frontend — nav bar | `frontend/src/components/Navigation.tsx` |
-| Frontend — tab visibility (AppShell) | `frontend/src/pages/AppShell.tsx` |
-| Frontend — auth context | `frontend/src/contexts/AuthContext.tsx` |
-| Audit log page | `frontend/src/pages/AuditLogPage.tsx` |
-| Company profile page | `frontend/src/pages/CompanyProfile.tsx` |
+- [ ] Add multi-company reputation comparison view on company profile page
+- [ ] Surface reputation score in GSTN search results
+- [ ] Add audit trail when a reputation score changes (record what triggered the recalculation)
 
 ---
 
-## Trust Level System Reference
+### Task 10: Search improvements
 
-| Level | Who it is | Can access |
-|---|---|---|
-| `new` | Newly registered user | Basic features only |
-| `verified` | Email-verified user | Basic features |
-| `trusted` | Established user | Extended features |
-| `moderator` | Appointed moderator | Audit Logs + moderation queue |
-| `admin` | Platform administrator | All features + user management |
-
-**To promote a user manually via SQL:**
-```sql
-UPDATE users SET trust_level = 'moderator' WHERE username = 'username_here';
-```
+- [ ] Add mobile-number search disambiguation UI to the frontend
+- [ ] Add "age warning" banner on search results for incidents older than 10 years
+- [ ] Show remaining daily search count to the user in the search UI
 
 ---
 
-## Related Documents
-
-- [PROJECT_OVERVIEW_AND_STATUS.md](./PROJECT_OVERVIEW_AND_STATUS.md) — Full project status and overview
-- [ROADMAP.md](./ROADMAP.md) — Full feature roadmap
-- [NEXT_STEPS.md](./NEXT_STEPS.md) — Detailed task guide with code examples
-- [START_HERE.md](../START_HERE.md) — How to run the project locally
+*For the full technical roadmap, see [ROADMAP.md](./ROADMAP.md). For the project overview, see [PROJECT_OVERVIEW_AND_STATUS.md](./PROJECT_OVERVIEW_AND_STATUS.md).*
