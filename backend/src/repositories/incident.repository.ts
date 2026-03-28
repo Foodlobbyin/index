@@ -261,6 +261,5 @@ export class IncidentRepository {
 
     return result.rowCount !== null && result.rowCount > 0;
   }}
-}
 
 export default new IncidentRepository();
