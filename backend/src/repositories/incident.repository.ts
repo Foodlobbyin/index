@@ -194,6 +194,7 @@ export class IncidentRepository {
       `SELECT * FROM incidents WHERE status IN ('submitted', 'under_review') ORDER BY created_at ASC`
     );
     return result.rows;
+      }
   
   
     /**
