@@ -17,6 +17,27 @@
 **Ready to run on localhost:**  
 All migrations `000`–`008` are complete and can be applied via `psql` or Docker exec.
 
+**Phase 2 (Backend Models & Services) — TYPES & SERVICES COMPLETE:**
+
+- ✅ TypeScript interfaces created in `backend/src/types/incident.types.ts` (Incident, IncidentEvidence, IncidentResponse, ContactPerson, IncidentPenalty, etc.)
+- ✅ Repository methods enhanced:
+  - `softDelete()` with litigation_hold check in incident.repository.ts
+  - `findByMobile()` in contactPerson.repository.ts  
+  - `findCompaniesByMobile()` in contactPerson.repository.ts
+- ✅ SearchService created in `backend/src/services/search.service.ts`:
+  - `searchByGSTN()` with rate limiting (100/hour)
+  - `searchByMobile()` with company results
+  - Audit logging to search_logs table
+  - Rate limit status tracking
+- ✅ Controllers verified complete (incident.controller.ts with all CRUD + search operations)
+- ✅ Routes verified complete (incident.routes.ts with all endpoints properly wired)
+
+**Migration 009 added:**
+Rename `user_searches` to `search_logs` with search_type column for GSTN/mobile differentiation.
+
+**Ready for Phase 3 (API Testing):**
+All backend models, repositories, services, and controllers are in place. The API layer is complete and ready for integration testing.
+
 ---
 
 This checklist guides the step-by-step implementation of the Incidents System. Work through phases in order. Each phase builds on the previous one.
