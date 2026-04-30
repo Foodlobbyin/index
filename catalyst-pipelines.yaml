@@ -1,0 +1,29 @@
+# Catalyst Pipelines CI/CD configuration
+# https://docs.catalyst.zoho.com/en/pipelines/
+#
+# This pipeline:
+#  1. Installs backend deps and builds the TypeScript app (dist/)
+#  2. Installs the Catalyst CLI
+#  3. Deploys the AppSail service to your Catalyst project
+#
+# Prerequisites (one-time, in Catalyst Pipelines UI):
+#  - Add Global Variable CATALYST_TOKEN  (generate via: catalyst auth:login on local then `catalyst auth:tokens`)
+#  - Add Global Variable CI = false      (so warnings don't fail the build)
+#  - Make sure catalyst.json exists at the repo root with the correct project_id
+
+version: 1
+
+jobs:
+  build-and-deploy:
+    steps:
+      - cd backend
+      - npm install
+      - npm run build
+      - cd ..
+      - npm install -g zcatalyst-cli@beta
+      - catalyst deploy --project "$CATALYST_PROJECT_NAME" --org "$CATALYST_ORG" --token "$CATALYST_TOKEN"
+
+stages:
+  - name: deploy
+    jobs:
+      - build-and-deploy

@@ -1,0 +1,10 @@
+{
+  "command": "node dist/index.js",
+  "buildPath": "/backend",
+  "stack": "node20",
+  "env_variables": {},
+  "memory": 256,
+  "scripts": {
+    "predeploy": "cd backend && npm install && npm run build"
+  }
+}
