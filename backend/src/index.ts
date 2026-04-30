@@ -17,7 +17,9 @@ import { apiLimiter } from './middleware/rateLimiter';
 import { setupSwagger } from './config/swagger';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+// Catalyst AppSail injects the listen port via X_ZOHO_CATALYST_LISTEN_PORT.
+// Fallback to PORT for other hosts (Render/Railway/etc) and finally 5000 for local dev.
+const PORT = process.env.X_ZOHO_CATALYST_LISTEN_PORT || process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
