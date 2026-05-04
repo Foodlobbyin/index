@@ -1,0 +1,46 @@
+name: Deploy Backend to Catalyst AppSail
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: ./backend
+
+      - name: Build TypeScript
+        run: npm run build
+        working-directory: ./backend
+
+      - name: Install Catalyst CLI
+        run: npm install -g @zohocloud/catalyst-cli
+
+      - name: Create Catalyst config
+        run: |
+          mkdir -p .catalyst
+          echo '${{ secrets.CATALYST_JSON }}' > catalyst.json
+        working-directory: ./backend
+
+      - name: Deploy to AppSail
+        run: catalyst appsail deploy --service-name foodlobby-backend --stack node20
+        working-directory: ./backend
+        env:
+          CATALYST_ACCOUNTID: ${{ secrets.CATALYST_ACCOUNT_ID }}
+          CATALYST_PROJECTID: ${{ secrets.CATALYST_PROJECT_ID }}
