@@ -28,18 +28,21 @@ jobs:
       - name: Build TypeScript
         run: npm run build
         working-directory: ./backend
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
 
       - name: Install Catalyst CLI
         run: npm install -g @zohocloud/catalyst-cli
 
-      - name: Create Catalyst config
-        run: |
-          mkdir -p .catalyst
-          echo '${{ secrets.CATALYST_JSON }}' > catalyst.json
-        working-directory: ./backend
-
       - name: Deploy to AppSail
-        run: catalyst appsail deploy --service-name foodlobby-backend --stack node20
+        run: |
+          catalyst appsail deploy \
+            --service-name foodlobby-backend \
+            --stack node20 \
+            --token ${{ secrets.CATALYST_TOKEN }}
         working-directory: ./backend
         env:
           CATALYST_ACCOUNTID: ${{ secrets.CATALYST_ACCOUNT_ID }}
