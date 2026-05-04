@@ -7,7 +7,7 @@ jobs:
       - npm run build
       - cd ..
       - npm install -g zcatalyst-cli@beta
-      - catalyst deploy appsail --name foodlobby-backend --build-path backend/dist --stack node20 --token $CATALYST_PROJECT_SECRET_KEY --org 60068817749 -p 38697000000012093
+      - catalyst deploy appsail standalone --name foodlobby-backend --build-path /catalyst/backend/dist --stack node20 --token $CATALYST_PROJECT_SECRET_KEY --org 60068817749 -p 38697000000012093
 stages:
   - name: deploy
     jobs:
