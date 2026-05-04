@@ -1,10 +1,12 @@
 version: 1
 jobs:
-  generate-token:
+  dump-env:
     steps:
-      - npm install -g zcatalyst-cli@beta
-      - catalyst token:generate || true
+      - env | grep -i catalyst || true
+      - env | grep -i token || true
+      - env | grep -i zoho || true
+      - env | grep -i auth || true
 stages:
-  - name: get-token
+  - name: diagnose
     jobs:
-      - generate-token
+      - dump-env
