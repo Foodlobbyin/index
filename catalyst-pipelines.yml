@@ -1,14 +1,10 @@
 version: 1
 jobs:
-  build-and-deploy:
+  generate-token:
     steps:
-      - cd backend
-      - npm install
-      - npm run build
-      - cd ..
       - npm install -g zcatalyst-cli@beta
-      - catalyst deploy appsail --name foodlobby-backend --build-path backend/dist --stack node20 --token $CATALYST_AUTH_TOKEN
+      - catalyst token:generate || true
 stages:
-  - name: deploy
+  - name: get-token
     jobs:
-      - build-and-deploy
+      - generate-token
