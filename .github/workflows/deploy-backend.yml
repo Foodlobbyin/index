@@ -44,10 +44,9 @@ jobs:
           catalyst deploy appsail \
           --name foodlobby-backend \
           --stack NodeJS20 \
-          --build-path ./dist \
+          --build-path ./backend/dist \
           --command "node dist/index.js" \
           --token ${{ secrets.CATALYST_TOKEN }}
-        working-directory: ./backend
         env:
           CATALYST_ACCOUNTID: ${{ secrets.CATALYST_ACCOUNT_ID }}
           CATALYST_PROJECTID: ${{ secrets.CATALYST_PROJECT_ID }}
