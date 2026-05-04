@@ -29,20 +29,24 @@ jobs:
         run: npm run build
         working-directory: ./backend
         env:
-          DB_HOST: ${{ secrets.DB_HOST }}
           DB_NAME: ${{ secrets.DB_NAME }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
       - name: Install Catalyst CLI
-        run: npm install -g @zohocloud/catalyst-cli
+        run: npm install -g zcatalyst-cli
 
       - name: Deploy to AppSail
         run: |
-          catalyst appsail deploy \
-            --service-name foodlobby-backend \
-            --stack node20 \
-            --token ${{ secrets.CATALYST_TOKEN }}
+          catalyst deploy appsail \
+          --name foodlobby-backend \
+          --stack NodeJS20 \
+          --build-path ./dist \
+          --command "node dist/index.js" \
+          --token ${{ secrets.CATALYST_TOKEN }}
         working-directory: ./backend
         env:
           CATALYST_ACCOUNTID: ${{ secrets.CATALYST_ACCOUNT_ID }}
