@@ -1,15 +1,12 @@
 version: 1
 jobs:
-  build-and-deploy:
+  diagnose:
     steps:
-      - cd backend
-      - npm install
-      - npm run build
-      - cd ..
       - npm install -g zcatalyst-cli
-      - printf '{"app_name":"foodlobby-backend","stack":"node20","build_path":"/catalyst/backend/dist","memory":256,"startup_command":"node dist/index.js"}' > app-config.json
-      - echo foodlobby-backend | CI=false catalyst deploy appsail --token $CATALYST_PROJECT_SECRET_KEY --org 60068817749 -p 38697000000012093
+      - catalyst -v
+      - catalyst help deploy || true
+      - catalyst deploy --help || true
 stages:
-  - name: deploy
+  - name: debug
     jobs:
-      - build-and-deploy
+      - diagnose
