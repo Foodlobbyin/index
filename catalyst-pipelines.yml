@@ -1,12 +1,14 @@
 version: 1
 jobs:
-  dump-env:
+  build-and-deploy:
     steps:
-      - env | grep -i catalyst || true
-      - env | grep -i token || true
-      - env | grep -i zoho || true
-      - env | grep -i auth || true
+      - cd backend
+      - npm install
+      - npm run build
+      - cd ..
+      - npm install -g zcatalyst-cli@beta
+      - catalyst deploy appsail --name foodlobby-backend --build-path backend/dist --stack node20 --token << env.CATALYST_TOKEN >> --org << env.CATALYST_ORG >> -p << env.CATALYST_PROJECT_ID >>
 stages:
-  - name: diagnose
+  - name: deploy
     jobs:
-      - dump-env
+      - build-and-deploy
