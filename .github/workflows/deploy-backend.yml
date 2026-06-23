@@ -39,13 +39,16 @@ jobs:
       - name: Install Catalyst CLI
         run: npm install -g zcatalyst-cli
 
+      - name: Copy catalyst.json to backend/dist
+        run: cp catalyst.json backend/dist/catalyst.json
+
       - name: Deploy to AppSail
+        working-directory: ./backend/dist
         run: |
           catalyst deploy appsail \
           --name foodlobby-backend \
           --stack NodeJS20 \
-          --build-path $GITHUB_WORKSPACE/backend/dist \
-          --command "node dist/index.js" \
+          --command "node index.js" \
           --org ${{ secrets.CATALYST_ACCOUNT_ID }} \
           --project ${{ secrets.CATALYST_PROJECT_ID }} \
           --token ${{ secrets.CATALYST_TOKEN }}
