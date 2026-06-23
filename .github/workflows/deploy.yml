@@ -1,4 +1,20 @@
-name: Deploy Frontend to GitHub Pages
+# Frontend is now deployed via Cloudflare Pages (native Git integration)
+# Cloudflare Pages automatically builds and deploys on every push to main
+# that affects the frontend/ directory.
+#
+# Cloudflare Pages Project: foodlobbyin-frontend
+# Live URL: https://foodlobbyin-frontend.pages.dev
+#
+# Build settings configured in Cloudflare Pages dashboard:
+#   Framework preset: React (Vite)
+#   Root directory:   /frontend
+#   Build command:    npm run build
+#   Output directory: dist
+#
+# This file is kept as documentation. No GitHub Actions workflow
+# is needed since Cloudflare Pages handles CI/CD natively.
+
+name: Deploy Frontend to Cloudflare Pages (Info Only)
 
 on:
   push:
@@ -6,59 +22,14 @@ on:
       - main
     paths:
       - 'frontend/**'
-      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: 'pages'
-  cancel-in-progress: true
-
 jobs:
-  build:
+  info:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install dependencies
-        run: npm install
-        working-directory: ./frontend
-
-      - name: Rebuild esbuild
-        run: npm rebuild esbuild
-        working-directory: ./frontend
-
-      - name: Build
-        run: npm run build
-        working-directory: ./frontend
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './frontend/dist'
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Deployment info
+        run: |
+          echo "Frontend is automatically deployed to Cloudflare Pages."
+          echo "URL: https://foodlobbyin-frontend.pages.dev"
+          echo "Cloudflare Pages handles the build and deployment natively."
