@@ -39,6 +39,17 @@ jobs:
       - name: Install Catalyst CLI
         run: npm install -g zcatalyst-cli
 
+      - name: Get Catalyst Access Token
+        id: get_token
+        run: |
+          RESPONSE=$(curl -s -X POST "https://accounts.zoho.in/oauth/v2/token" \
+            -d "grant_type=refresh_token" \
+            -d "refresh_token=${{ secrets.CATALYST_TOKEN }}" \
+            -d "client_id=${{ secrets.CATALYST_CLIENT_ID }}" \
+            -d "client_secret=${{ secrets.CATALYST_CLIENT_SECRET }}")
+          ACCESS_TOKEN=$(echo $RESPONSE | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+          echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+
       - name: Copy catalyst.json to backend/dist
         run: cp catalyst.json backend/dist/catalyst.json
 
@@ -51,4 +62,4 @@ jobs:
           --command "node index.js" \
           --org ${{ secrets.CATALYST_ACCOUNT_ID }} \
           --project ${{ secrets.CATALYST_PROJECT_ID }} \
-          --token ${{ secrets.CATALYST_TOKEN }}
+          --token ${{ steps.get_token.outputs.access_token }}
