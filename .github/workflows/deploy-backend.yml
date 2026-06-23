@@ -28,38 +28,37 @@ jobs:
       - name: Build TypeScript
         run: npm run build
         working-directory: ./backend
-        env:
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
       - name: Install Catalyst CLI
-        run: npm install -g zcatalyst-cli
+        run: npm install -g @zohocloud/catalyst-cli
 
       - name: Get Catalyst Access Token
         id: get_token
         run: |
           RESPONSE=$(curl -s -X POST "https://accounts.zoho.in/oauth/v2/token" \
-            -d "grant_type=refresh_token" \
-            -d "refresh_token=${{ secrets.CATALYST_TOKEN }}" \
-            -d "client_id=${{ secrets.CATALYST_CLIENT_ID }}" \
-            -d "client_secret=${{ secrets.CATALYST_CLIENT_SECRET }}")
-          ACCESS_TOKEN=$(echo $RESPONSE | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+            -d "grant_type=authorization_code" \
+            -d "code=1000.25d72cecbdea4c47bdd52f94dd1255cd.645720f7ab38ca462f1e45e5684a522a" \
+            -d "client_id=1000.Z5XO65U7IDI2YQ8O0S4E3N2S77MZVV" \
+            -d "client_secret=b73771a18bbc64eac2974585ecda8953f37ee89516")
+          echo "FULL_RESPONSE=$RESPONSE"
+          ACCESS_TOKEN=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('access_token',''))")
+          REFRESH_TOKEN=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('refresh_token',''))")
+          echo "ACCESS_TOKEN=$ACCESS_TOKEN"
+          echo "REFRESH_TOKEN=$REFRESH_TOKEN"
           echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+        shell: /usr/bin/bash -e {0}
 
       - name: Copy catalyst.json to backend/dist
-        run: cp catalyst.json backend/dist/catalyst.json
+        run: cp catalyst.json backend/dist/
 
       - name: Deploy to AppSail
-        working-directory: ./backend/dist
         run: |
           catalyst deploy appsail \
-          --name foodlobby-backend \
-          --stack NodeJS20 \
-          --command "node index.js" \
-          --org ${{ secrets.CATALYST_ACCOUNT_ID }} \
-          --project ${{ secrets.CATALYST_PROJECT_ID }} \
-          --token ${{ steps.get_token.outputs.access_token }}
+            --name foodlobby-backend \
+            --stack NodeJS20 \
+            --command "node index.js" \
+            --org ${{ secrets.CATALYST_ACCOUNT_ID }} \
+            --project ${{ secrets.CATALYST_PROJECT_ID }} \
+            --token ${{ steps.get_token.outputs.access_token }}
+        working-directory: ./backend/dist
+        shell: /usr/bin/bash -e {0}
