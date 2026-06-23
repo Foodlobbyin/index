@@ -15,21 +15,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   useEffect(() => {
     // Check if user is already authenticated on mount
     const checkAuth = async () => {
       try {
         const authenticated = authService.isAuthenticated();
         setIsAuthenticated(authenticated);
-        
+
         if (authenticated) {
-          // Try to get user profile
           try {
-            const profile = await authService.getProfile();
+            // Add a 5-second timeout so the page doesn't hang if backend is unreachable
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Auth check timeout')), 5000)
+            );
+            const profile = await Promise.race([authService.getProfile(), timeoutPromise]);
             setUser(profile);
           } catch (error) {
-            // If profile fetch fails, clear auth
             authService.logout();
             setIsAuthenticated(false);
           }
@@ -40,22 +42,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       }
     };
-    
+
     checkAuth();
   }, []);
-  
-  const login = (token: string, userData: any) => {
+
+  const login = (token: string, user: any) => {
     localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
     setIsAuthenticated(true);
-    setUser(userData);
+    setUser(user);
   };
-  
+
   const logout = () => {
     authService.logout();
     setIsAuthenticated(false);
     setUser(null);
   };
-  
+
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, login, logout, loading }}>
       {children}
@@ -70,3 +73,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+export default AuthContext;
