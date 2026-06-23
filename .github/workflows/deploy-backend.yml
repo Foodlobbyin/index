@@ -46,7 +46,6 @@ jobs:
           --stack NodeJS20 \
           --build-path ./backend/dist \
           --command "node dist/index.js" \
+          --org ${{ secrets.CATALYST_ACCOUNT_ID }} \
+          --project ${{ secrets.CATALYST_PROJECT_ID }} \
           --token ${{ secrets.CATALYST_TOKEN }}
-        env:
-          CATALYST_ACCOUNTID: ${{ secrets.CATALYST_ACCOUNT_ID }}
-          CATALYST_PROJECTID: ${{ secrets.CATALYST_PROJECT_ID }}
