@@ -30,23 +30,23 @@ jobs:
         working-directory: ./backend
 
       - name: Install Catalyst CLI
-        run: npm install -g @zohocloud/catalyst-cli
+        run: npm install -g zcatalyst-cli
 
       - name: Get Catalyst Access Token
         id: get_token
         run: |
           RESPONSE=$(curl -s -X POST "https://accounts.zoho.in/oauth/v2/token" \
             -d "grant_type=authorization_code" \
-            -d "code=1000.25d72cecbdea4c47bdd52f94dd1255cd.645720f7ab38ca462f1e45e5684a522a" \
+            -d "code=1000.84a2ae2123184e955c8f0351855989c1.b5f367e4f3f8ada0f98a0da9eb33e1d2" \
             -d "client_id=1000.Z5XO65U7IDI2YQ8O0S4E3N2S77MZVV" \
             -d "client_secret=b73771a18bbc64eac2974585ecda8953f37ee89516")
           echo "FULL_RESPONSE=$RESPONSE"
-          ACCESS_TOKEN=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('access_token',''))")
-          REFRESH_TOKEN=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('refresh_token',''))")
+          ACCESS_TOKEN=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('access_token','NONE'))")
+          REFRESH_TOKEN=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('refresh_token','NONE'))")
           echo "ACCESS_TOKEN=$ACCESS_TOKEN"
           echo "REFRESH_TOKEN=$REFRESH_TOKEN"
           echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
-        shell: /usr/bin/bash -e {0}
+        shell: /usr/bin/bash {0}
 
       - name: Copy catalyst.json to backend/dist
         run: cp catalyst.json backend/dist/
@@ -61,4 +61,4 @@ jobs:
             --project ${{ secrets.CATALYST_PROJECT_ID }} \
             --token ${{ steps.get_token.outputs.access_token }}
         working-directory: ./backend/dist
-        shell: /usr/bin/bash -e {0}
+        shell: /usr/bin/bash {0}
