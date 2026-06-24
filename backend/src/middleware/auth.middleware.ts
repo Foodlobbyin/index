@@ -1,6 +1,7 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import { jwtVerify } from 'jose';
 import type { AppBindings } from '../types/env';
+import { createDbClient } from '../config/database';
 
 /**
  * Shape of the authenticated user attached to the Hono context via `c.set('user', ...)`
@@ -27,6 +28,7 @@ export interface AuthRequest {
 /**
  * Hono auth guard. Reads the JWT from the `Authorization: Bearer <token>` header,
  * verifies it with `jose`, and stores the decoded user on the context.
+ * Trust level is fetched live from DB so it is always current.
  */
 export const authMiddleware: MiddlewareHandler<AppBindings> = async (
   c: Context<AppBindings>,
@@ -43,13 +45,18 @@ export const authMiddleware: MiddlewareHandler<AppBindings> = async (
     const secret = new TextEncoder().encode(c.env.JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
 
-    // Fetch trust_level from DB so it's always current
-    // (JWT only contains id + username for compactness)
-    c.set('user', {
-      id: (payload as { id: number }).id,
-      username: (payload as { username: string }).username,
-      trust_level: (payload as { trust_level?: string }).trust_level,
-    });
+    const userId = (payload as { id: number }).id;
+    const username = (payload as { username: string }).username;
+
+    // Fetch trust_level live from DB so it is always current
+    const db = createDbClient(c.env.DATABASE_URL);
+    const row = await db.query(
+      'SELECT trust_level FROM users WHERE id = $1',
+      [userId]
+    );
+    const trust_level: string = row.rows[0]?.trust_level ?? 'new';
+
+    c.set('user', { id: userId, username, trust_level });
     await next();
     return;
   } catch (error) {
