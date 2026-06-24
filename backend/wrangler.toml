@@ -3,17 +3,21 @@ main = "src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
+# Custom domain — api.foodlobby.in (configured via Workers dashboard)
+routes = [
+  { pattern = "api.foodlobby.in/*", zone_name = "foodlobby.in" }
+]
+
 [vars]
 NODE_ENV = "production"
+FRONTEND_URL = "https://foodlobby.in"
 
 # Secrets (set via: wrangler secret put SECRET_NAME)
 # DATABASE_URL
 # JWT_SECRET
-# EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASSWORD, EMAIL_FROM (Phase 2)
 # EMAIL_FROM
 # RESEND_API_KEY — HTTP email via Resend (https://resend.com)
 # RECAPTCHA_SECRET_KEY
-# FRONTEND_URL
 # MAX_OTP_GENERATION_PER_HOUR
 # MAX_OTP_VERIFICATION_ATTEMPTS
 # OTP_EXPIRY_MINUTES
@@ -27,3 +31,4 @@ preview_id = "c7f1edb81ada49738faf8bf6ad171fa4"
 [[r2_buckets]]
 binding = "EVIDENCE_BUCKET"
 bucket_name = "foodlobbyin-evidence"
+
