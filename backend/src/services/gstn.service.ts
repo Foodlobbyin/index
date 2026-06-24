@@ -79,4 +79,16 @@ export async function verifyGSTN(
   };
 }
 
-export default { verifyGSTN };
+/**
+ * assertValid — synchronous GSTN format + checksum check.
+ * Throws an Error if invalid. Used by incident.service.ts and other callers
+ * that need a quick guard without an async API call.
+ */
+function assertValid(gstn: string): void {
+  if (!gstn) throw new Error('GSTN is required.');
+  if (!validateGSTNChecksum(gstn.toUpperCase().trim())) {
+    throw new Error('Invalid GSTN: format or checksum check failed.');
+  }
+}
+
+export default { verifyGSTN, assertValid };
