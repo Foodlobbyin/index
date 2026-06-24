@@ -21,6 +21,14 @@ const INDIAN_STATES = [
   'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
 ];
 
+interface InvoiceRow {
+  invoice_amount: string;
+  unpaid_amount: string;
+  invoice_date: string;
+  due_date: string;
+  item_sold: string;
+}
+
 interface ContactPerson {
   name: string;
   position: string;
@@ -28,18 +36,30 @@ interface ContactPerson {
   phone: string;
 }
 
-interface ExtendedFormData extends Omit<IncidentCreateInput, 'invoice_amount' | 'unpaid_amount' | 'incident_date' | 'incident_title'> {
+interface FormData {
+  // Step 1
+  company_gstn: string;
+  company_name: string;
   state: string;
   pincode: string;
   street_address: string;
   msme_udyam_number: string;
-  invoice_amount: string;
-  unpaid_amount: string;
-  invoice_date: string;
-  due_date: string;
-  item_sold: string;
+  // Step 2
+  incident_type: IncidentType;
+  description: string;
+  currency_code: string;
+  invoices: InvoiceRow[];
+  // Step 3
   contact_persons: ContactPerson[];
 }
+
+const emptyInvoice = (): InvoiceRow => ({
+  invoice_amount: '',
+  unpaid_amount: '',
+  invoice_date: '',
+  due_date: '',
+  item_sold: '',
+});
 
 const emptyContact = (): ContactPerson => ({ name: '', position: '', email: '', phone: '' });
 
@@ -51,47 +71,50 @@ const ReportIncidentPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState<ExtendedFormData>({
-    // Step 1 – Company Details
+  const [formData, setFormData] = useState<FormData>({
     company_gstn: '',
     company_name: '',
     state: '',
     pincode: '',
     street_address: '',
     msme_udyam_number: '',
-    // Step 2 – Incident / Invoice Details
     incident_type: 'FRAUD',
-    invoice_amount: '',
-    unpaid_amount: '',
     description: '',
-    invoice_date: '',
-    due_date: '',
-    item_sold: '',
-    amount_involved: undefined,
     currency_code: 'INR',
-    is_anonymous: false,
-    // Step 3 – Contact Persons
+    invoices: [emptyInvoice()],
     contact_persons: [emptyContact()],
   });
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
-
+  // ── Generic field handler ─────────────────────────────────────────────────
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
-    const { name, value, type } = e.target;
-    if (type === 'checkbox') {
-      setFormData((prev) => ({ ...prev, [name]: (e.target as HTMLInputElement).checked }));
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleContactChange = (
-    index: number,
-    field: keyof ContactPerson,
-    value: string
-  ) => {
+  // ── Invoice row handlers ──────────────────────────────────────────────────
+  const handleInvoiceChange = (index: number, field: keyof InvoiceRow, value: string) => {
+    setFormData((prev) => {
+      const updated = [...prev.invoices];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, invoices: updated };
+    });
+  };
+
+  const addInvoice = () => {
+    setFormData((prev) => ({ ...prev, invoices: [...prev.invoices, emptyInvoice()] }));
+  };
+
+  const removeInvoice = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      invoices: prev.invoices.filter((_, i) => i !== index),
+    }));
+  };
+
+  // ── Contact person handlers ───────────────────────────────────────────────
+  const handleContactChange = (index: number, field: keyof ContactPerson, value: string) => {
     setFormData((prev) => {
       const updated = [...prev.contact_persons];
       updated[index] = { ...updated[index], [field]: value };
@@ -114,13 +137,20 @@ const ReportIncidentPage: React.FC = () => {
   };
 
   // ── Step navigation ───────────────────────────────────────────────────────
-
   const goNext = () => {
     setError(null);
-    // Step 2 validation — Description is mandatory
-    if (step === 2 && !(formData.description ?? '').trim()) {
-      setError('Description is required. Please enter details about the incident in the Description field above.');
+    if (step === 2 && !formData.description.trim()) {
+      setError('Description is required. Please describe the incident.');
       return;
+    }
+    if (step === 2) {
+      const hasInvoice = formData.invoices.some(
+        (inv) => inv.invoice_amount.trim() !== '' || inv.unpaid_amount.trim() !== ''
+      );
+      if (!hasInvoice) {
+        setError('Please enter at least one invoice with Invoice Amount or Unpaid Amount.');
+        return;
+      }
     }
     setStep((s) => Math.min(s + 1, TOTAL_STEPS));
   };
@@ -131,34 +161,39 @@ const ReportIncidentPage: React.FC = () => {
   };
 
   // ── Submit ────────────────────────────────────────────────────────────────
-
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      const invoiceAmt = formData.invoice_amount !== '' ? parseFloat(formData.invoice_amount) : undefined;
-      const unpaidAmt = formData.unpaid_amount !== '' ? parseFloat(formData.unpaid_amount) : undefined;
+      // Filter out blank invoice rows
+      const validInvoices = formData.invoices.filter(
+        (inv) => inv.invoice_amount.trim() !== '' || inv.unpaid_amount.trim() !== ''
+      );
+
+      // Compute total amount_involved for the incident record (sum of all invoice amounts)
+      const totalInvolved = validInvoices.reduce(
+        (sum, inv) => sum + (parseFloat(inv.invoice_amount) || 0),
+        0
+      );
 
       const payload: IncidentCreateInput & Record<string, unknown> = {
         company_gstn: formData.company_gstn || undefined,
         company_name: formData.company_name,
-        state: formData.state,
+        state: formData.state || undefined,
         pincode: formData.pincode || undefined,
         street_address: formData.street_address || undefined,
         msme_udyam_number: formData.msme_udyam_number || undefined,
         incident_type: formData.incident_type,
-        incident_date: new Date().toISOString().split('T')[0], // auto-set to today
-        incident_title: `${formData.incident_type} - ${formData.company_name}`, // auto-generated
+        incident_date: new Date().toISOString().split('T')[0],
+        incident_title: `${formData.incident_type} - ${formData.company_name}`,
         description: formData.description || '',
-        invoice_amount: invoiceAmt,
-        unpaid_amount: unpaidAmt,
-        invoice_date: formData.invoice_date || undefined,
-        due_date: formData.due_date || undefined,
-        item_sold: formData.item_sold || undefined,
-        amount_involved: invoiceAmt,
-        currency_code: formData.currency_code,
-        is_anonymous: true, // always anonymous — no checkbox needed
+        amount_involved: totalInvolved || undefined,
+        currency_code: formData.currency_code || 'INR',
+        is_anonymous: true,
+        // Multi-invoice array — saved to incident_invoices table
+        invoices: validInvoices,
+        // Contact persons — upserted to contact_persons table
         contact_persons: formData.contact_persons.filter((c) => c.name.trim() !== ''),
       };
 
@@ -176,13 +211,10 @@ const ReportIncidentPage: React.FC = () => {
   };
 
   // ── Styles ────────────────────────────────────────────────────────────────
-
   const inputClass =
     'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
   const labelClass = 'block text-sm font-medium text-gray-700 mb-1';
   const sectionTitle = 'text-base font-semibold text-gray-800 mb-4';
-
-  // ── Step indicators ───────────────────────────────────────────────────────
 
   const steps = [
     { label: 'Company Details' },
@@ -242,112 +274,58 @@ const ReportIncidentPage: React.FC = () => {
           onSubmit={step === TOTAL_STEPS ? handleSubmit : (e) => { e.preventDefault(); goNext(); }}
           className="space-y-5"
         >
-          {/* ═══════════════════════════════════════════════════════════════
-              STEP 1 – COMPANY DETAILS
-          ═══════════════════════════════════════════════════════════════ */}
+          {/* ═══════════════ STEP 1 – COMPANY DETAILS ═══════════════════ */}
           {step === 1 && (
             <>
               <p className={sectionTitle}>Company Details</p>
 
-              {/* GSTIN */}
               <div>
-                <label className={labelClass}>
-                  Company GSTIN <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="company_gstn"
-                  className={inputClass}
-                  value={formData.company_gstn ?? ''}
-                  onChange={handleChange}
-                  placeholder="e.g. 29ABCDE1234F1Z5"
-                  required
-                  maxLength={15}
-                />
+                <label className={labelClass}>Company GSTIN <span className="text-red-500">*</span></label>
+                <input type="text" name="company_gstn" className={inputClass}
+                  value={formData.company_gstn} onChange={handleChange}
+                  placeholder="e.g. 29ABCDE1234F1Z5" required maxLength={15} />
               </div>
 
-              {/* Company Name */}
               <div>
-                <label className={labelClass}>
-                  Company Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="company_name"
-                  className={inputClass}
-                  value={formData.company_name}
-                  onChange={handleChange}
-                  placeholder="Registered company name"
-                  required
-                />
+                <label className={labelClass}>Company Name <span className="text-red-500">*</span></label>
+                <input type="text" name="company_name" className={inputClass}
+                  value={formData.company_name} onChange={handleChange}
+                  placeholder="Registered company name" required />
               </div>
 
-              {/* State */}
               <div>
-                <label className={labelClass}>
-                  State <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="state"
-                  className={inputClass}
-                  value={formData.state}
-                  onChange={handleChange}
-                  required
-                >
+                <label className={labelClass}>State <span className="text-red-500">*</span></label>
+                <select name="state" className={inputClass} value={formData.state} onChange={handleChange} required>
                   <option value="">Select state</option>
-                  {INDIAN_STATES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
+                  {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
 
-              {/* Pincode + Street (optional) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelClass}>Pincode</label>
-                  <input
-                    type="text"
-                    name="pincode"
-                    className={inputClass}
-                    value={formData.pincode}
-                    onChange={handleChange}
-                    placeholder="e.g. 360001"
-                    maxLength={6}
-                    pattern="[0-9]{6}"
-                    title="6-digit pincode"
-                  />
+                  <input type="text" name="pincode" className={inputClass}
+                    value={formData.pincode} onChange={handleChange}
+                    placeholder="e.g. 360001" maxLength={6} />
                 </div>
                 <div>
                   <label className={labelClass}>Street Address</label>
-                  <input
-                    type="text"
-                    name="street_address"
-                    className={inputClass}
-                    value={formData.street_address}
-                    onChange={handleChange}
-                    placeholder="Building, street, locality"
-                  />
+                  <input type="text" name="street_address" className={inputClass}
+                    value={formData.street_address} onChange={handleChange}
+                    placeholder="Building, street, locality" />
                 </div>
               </div>
 
-              {/* MSME / Udyam Aadhaar */}
               <div>
-                <label className={labelClass}>MSME / Udyam Aadhaar Number</label>
-                <input
-                  type="text"
-                  name="msme_udyam_number"
-                  className={inputClass}
-                  value={formData.msme_udyam_number}
-                  onChange={handleChange}
-                  placeholder="e.g. UDYAM-GJ-00-0000000"
-                />
+                <label className={labelClass}>MSME / Udyam Number</label>
+                <input type="text" name="msme_udyam_number" className={inputClass}
+                  value={formData.msme_udyam_number} onChange={handleChange}
+                  placeholder="e.g. UDYAM-GJ-00-0000000" />
               </div>
             </>
           )}
 
-          {/* ═══════════════════════════════════════════════════════════════
-              STEP 2 – INVOICE / INCIDENT DETAILS
-          ═══════════════════════════════════════════════════════════════ */}
+          {/* ═══════════════ STEP 2 – INVOICE DETAILS (multi-row) ══════════ */}
           {step === 2 && (
             <>
               <p className={sectionTitle}>Incident & Invoice Details</p>
@@ -358,139 +336,120 @@ const ReportIncidentPage: React.FC = () => {
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                 </svg>
                 <p>
-                  <span className="font-semibold">Your identity is always protected.</span> Your name, email, and company details will never be made public. Other users can only see the reported company's name, incident type, and financial figures — never who submitted this report.
+                  <span className="font-semibold">Your identity is always protected.</span> Only the reported company's details and financial figures are visible to other users — never who submitted this report.
                 </p>
               </div>
 
               {/* Incident Type */}
               <div>
-                <label className={labelClass}>
-                  Incident Type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="incident_type"
-                  className={inputClass}
-                  value={formData.incident_type}
-                  onChange={handleChange}
-                  required
-                >
+                <label className={labelClass}>Incident Type <span className="text-red-500">*</span></label>
+                <select name="incident_type" className={inputClass} value={formData.incident_type} onChange={handleChange} required>
                   {INCIDENT_TYPES.map(({ value, label }) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Invoice Amount + Unpaid Amount */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>
-                    Invoice Amount (₹) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="invoice_amount"
-                    className={inputClass}
-                    value={formData.invoice_amount}
-                    onChange={handleChange}
-                    placeholder="Total invoice value"
-                    min="0"
-                    step="0.01"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>
-                    Unpaid Amount (₹) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="unpaid_amount"
-                    className={inputClass}
-                    value={formData.unpaid_amount}
-                    onChange={handleChange}
-                    placeholder="Amount still unpaid"
-                    min="0"
-                    step="0.01"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Invoice Date + Due Date */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>Invoice Date</label>
-                  <input
-                    type="date"
-                    name="invoice_date"
-                    className={inputClass}
-                    value={formData.invoice_date}
-                    onChange={handleChange}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>Due Date</label>
-                  <input
-                    type="date"
-                    name="due_date"
-                    className={inputClass}
-                    value={formData.due_date}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-
-              {/* Item Sold (optional) */}
-              <div>
-                <label className={labelClass}>Item / Product Sold</label>
-                <input
-                  type="text"
-                  name="item_sold"
-                  className={inputClass}
-                  value={formData.item_sold}
-                  onChange={handleChange}
-                  placeholder="e.g. Cumin Seeds 100kg (optional)"
-                />
-              </div>
-
-              {/* Description — mandatory */}
+              {/* Description */}
               <div>
                 <label className={labelClass}>Description <span className="text-red-500">*</span></label>
-                <textarea
-                  name="description"
-                  className={`${inputClass} resize-y min-h-[80px]`}
-                  value={formData.description ?? ''}
-                  onChange={handleChange}
-                  placeholder="Describe the incident — payment default, bounced cheque, etc."
-                  required
-                />
+                <textarea name="description" className={`${inputClass} resize-y min-h-[80px]`}
+                  value={formData.description} onChange={handleChange}
+                  placeholder="Describe the incident — payment default, bounced cheque, quality dispute, etc."
+                  required />
+              </div>
+
+              {/* ── Invoice rows ─────────────────────────────────────────── */}
+              <div>
+                <label className={labelClass}>
+                  Invoices <span className="text-red-500">*</span>
+                  <span className="text-gray-400 font-normal ml-2">(add all unpaid invoices in this incident)</span>
+                </label>
+
+                <div className="space-y-3 mt-2">
+                  {formData.invoices.map((inv, idx) => (
+                    <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-gray-50 relative">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Invoice {idx + 1}</span>
+                        {formData.invoices.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeInvoice(idx)}
+                            className="w-6 h-6 flex items-center justify-center rounded-full bg-red-100 text-red-500 hover:bg-red-200 transition-colors"
+                            title="Remove invoice"
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelClass}>Invoice Amount (₹) <span className="text-red-500">*</span></label>
+                          <input type="number" className={inputClass}
+                            value={inv.invoice_amount}
+                            onChange={(e) => handleInvoiceChange(idx, 'invoice_amount', e.target.value)}
+                            placeholder="Total invoice value" min="0" step="0.01" />
+                        </div>
+                        <div>
+                          <label className={labelClass}>Unpaid Amount (₹) <span className="text-red-500">*</span></label>
+                          <input type="number" className={inputClass}
+                            value={inv.unpaid_amount}
+                            onChange={(e) => handleInvoiceChange(idx, 'unpaid_amount', e.target.value)}
+                            placeholder="Amount still unpaid" min="0" step="0.01" />
+                        </div>
+                        <div>
+                          <label className={labelClass}>Invoice Date</label>
+                          <input type="date" className={inputClass}
+                            value={inv.invoice_date}
+                            onChange={(e) => handleInvoiceChange(idx, 'invoice_date', e.target.value)} />
+                        </div>
+                        <div>
+                          <label className={labelClass}>Due Date</label>
+                          <input type="date" className={inputClass}
+                            value={inv.due_date}
+                            onChange={(e) => handleInvoiceChange(idx, 'due_date', e.target.value)} />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className={labelClass}>Item / Product Sold</label>
+                          <input type="text" className={inputClass}
+                            value={inv.item_sold}
+                            onChange={(e) => handleInvoiceChange(idx, 'item_sold', e.target.value)}
+                            placeholder="e.g. Cumin Seeds 100kg (optional)" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addInvoice}
+                  className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors mt-3"
+                >
+                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 hover:bg-blue-200 transition-colors text-blue-600 font-bold text-base leading-none">+</span>
+                  Add another invoice
+                </button>
               </div>
 
               {/* Currency */}
               <div className="flex items-center gap-3">
                 <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Currency</label>
-                <input
-                  type="text"
-                  name="currency_code"
-                  className={`${inputClass} max-w-[80px]`}
-                  value={formData.currency_code ?? 'INR'}
-                  onChange={handleChange}
-                  maxLength={3}
-                />
+                <input type="text" name="currency_code" className={`${inputClass} max-w-[80px]`}
+                  value={formData.currency_code} onChange={handleChange} maxLength={3} />
               </div>
-
-
             </>
           )}
 
-          {/* ═══════════════════════════════════════════════════════════════
-              STEP 3 – CONTACT PERSONS
-          ═══════════════════════════════════════════════════════════════ */}
+          {/* ═══════════════ STEP 3 – CONTACT PERSONS ════════════════════ */}
           {step === 3 && (
             <>
               <p className={sectionTitle}>Contact Persons</p>
               <p className="text-sm text-gray-500 -mt-3 mb-4">
-                Add the contact persons at the reported company. Click <span className="font-semibold">+</span> to add more.
+                Add the individuals involved in this deal at the reported company.
+                These names will be visible on the company profile to warn others.
               </p>
 
               <div className="space-y-3">
@@ -499,54 +458,24 @@ const ReportIncidentPage: React.FC = () => {
                     key={index}
                     className="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2"
                   >
-                    {/* Row number */}
                     <span className="text-xs font-semibold text-gray-400 w-5 shrink-0">{index + 1}.</span>
-
-                    {/* Name */}
-                    <input
-                      type="text"
-                      className={`${inputClass} flex-1 min-w-0`}
-                      placeholder="Full Name"
-                      value={contact.name}
+                    <input type="text" className={`${inputClass} flex-1 min-w-0`}
+                      placeholder="Full Name" value={contact.name}
                       onChange={(e) => handleContactChange(index, 'name', e.target.value)}
-                      required={index === 0}
-                    />
-
-                    {/* Position/Role */}
-                    <input
-                      type="text"
-                      className={`${inputClass} flex-1 min-w-0`}
-                      placeholder="Position / Role"
-                      value={contact.position}
-                      onChange={(e) => handleContactChange(index, 'position', e.target.value)}
-                    />
-
-                    {/* Email */}
-                    <input
-                      type="email"
-                      className={`${inputClass} flex-1 min-w-0`}
-                      placeholder="Email"
-                      value={contact.email}
-                      onChange={(e) => handleContactChange(index, 'email', e.target.value)}
-                    />
-
-                    {/* Phone */}
-                    <input
-                      type="tel"
-                      className={`${inputClass} flex-1 min-w-0`}
-                      placeholder="Phone Number"
-                      value={contact.phone}
-                      onChange={(e) => handleContactChange(index, 'phone', e.target.value)}
-                    />
-
-                    {/* Remove button (only if more than one row) */}
+                      required={index === 0} />
+                    <input type="text" className={`${inputClass} flex-1 min-w-0`}
+                      placeholder="Position / Role" value={contact.position}
+                      onChange={(e) => handleContactChange(index, 'position', e.target.value)} />
+                    <input type="email" className={`${inputClass} flex-1 min-w-0`}
+                      placeholder="Email" value={contact.email}
+                      onChange={(e) => handleContactChange(index, 'email', e.target.value)} />
+                    <input type="tel" className={`${inputClass} flex-1 min-w-0`}
+                      placeholder="Phone Number" value={contact.phone}
+                      onChange={(e) => handleContactChange(index, 'phone', e.target.value)} />
                     {formData.contact_persons.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeContact(index)}
+                      <button type="button" onClick={() => removeContact(index)}
                         className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-red-100 text-red-500 hover:bg-red-200 transition-colors"
-                        title="Remove contact"
-                      >
+                        title="Remove contact">
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -556,58 +485,37 @@ const ReportIncidentPage: React.FC = () => {
                 ))}
               </div>
 
-              {/* Add contact button */}
-              <button
-                type="button"
-                onClick={addContact}
-                className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors mt-1"
-              >
-                <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 hover:bg-blue-200 transition-colors text-blue-600 font-bold text-base leading-none">
-                  +
-                </span>
+              <button type="button" onClick={addContact}
+                className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors mt-1">
+                <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 hover:bg-blue-200 transition-colors text-blue-600 font-bold text-base leading-none">+</span>
                 Add another contact person
               </button>
             </>
           )}
 
-          {/* ── Navigation buttons ─────────────────────────────────────── */}
+          {/* ── Navigation buttons ──────────────────────────────────────── */}
           <div className="flex items-center justify-between pt-4 border-t border-gray-100">
             <div>
               {step > 1 && (
-                <button
-                  type="button"
-                  onClick={goBack}
-                  disabled={loading}
-                  className="px-5 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                >
+                <button type="button" onClick={goBack} disabled={loading}
+                  className="px-5 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors">
                   ← Back
                 </button>
               )}
             </div>
-
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate('/app/my-incidents')}
-                disabled={loading}
-                className="px-5 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 disabled:opacity-50 transition-colors"
-              >
+              <button type="button" onClick={() => navigate('/app/my-incidents')} disabled={loading}
+                className="px-5 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 disabled:opacity-50 transition-colors">
                 Cancel
               </button>
-
               {step < TOTAL_STEPS ? (
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                >
+                <button type="submit"
+                  className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
                   Next →
                 </button>
               ) : (
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
+                <button type="submit" disabled={loading}
+                  className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                   {loading ? 'Submitting…' : 'Submit Report'}
                 </button>
               )}
@@ -620,4 +528,3 @@ const ReportIncidentPage: React.FC = () => {
 };
 
 export default ReportIncidentPage;
-

@@ -16,6 +16,7 @@ import auditLogRoutes from './routes/auditLog.routes';
 import adminRoutes from './routes/admin.routes';
 import inviteRoutes from './routes/invite.routes';
 import waitlistRoutes from './routes/waitlist.routes';
+import contactRoutes from './routes/contact.routes';
 import healthRoutes from './routes/health';
 import { apiLimiter } from './middleware/rateLimiter';
 
@@ -164,6 +165,7 @@ app.route('/api/referrals', referralRoutes);
 app.route('/api/invite', inviteRoutes);
 app.route('/api/waitlist', waitlistRoutes);
 app.route('/api/company', companyRoutes);
+app.route('/api/contact', contactRoutes);
 app.route('/api/invoices', invoiceRoutes);
 app.route('/api/insights', insightsRoutes);
 app.route('/api/incidents', incidentRoutes);

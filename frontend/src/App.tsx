@@ -14,6 +14,7 @@ import AppShell from './pages/AppShell';
 import Dashboard from './pages/Dashboard';
 import CompanyProfile from './pages/CompanyProfile';
 import CompanyView from './pages/CompanyView';
+import ContactPersonPage from './pages/ContactPersonPage';
 import InsightsPage from './pages/InsightsPage';
 import InvoiceList from './pages/InvoiceList';
 import InvoiceCreatePage from './pages/InvoiceCreatePage';
@@ -73,6 +74,14 @@ export default function App(): JSX.Element {
             element={
               <ProtectedRoute>
                 <CompanyView />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/contact/:id"
+            element={
+              <ProtectedRoute>
+                <ContactPersonPage />
               </ProtectedRoute>
             }
           />

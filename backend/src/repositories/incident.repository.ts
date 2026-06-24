@@ -23,14 +23,8 @@ export class IncidentRepository {
       reporter_name,
       reporter_email,
       reporter_phone,
-      // Invoice fields (from Step 2 of the report form)
-      invoice_amount,
-      unpaid_amount,
-      invoice_date,
-      due_date,
-      item_sold,
-      // Contact persons (from Step 3)
-      contact_persons,
+      invoices: invoiceList,      // array of invoice objects from Step 2
+      contact_persons,            // array of contact person objects from Step 3
     } = data as any;
 
     // 1. Insert the incident record
@@ -42,7 +36,7 @@ export class IncidentRepository {
       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft',$9,$10,$11,$12,$13)
       RETURNING *`,
       [
-        company_gstn,
+        company_gstn || null,
         company_name,
         incident_type,
         incident_date,
@@ -59,58 +53,98 @@ export class IncidentRepository {
     );
     const incident = result.rows[0];
 
-    // 2. Save invoice details to invoices table (linked to the reported company)
-    if (invoice_amount || unpaid_amount || invoice_date || due_date) {
-      // Generate a unique invoice number: INC-<incidentId>-<timestamp>
-      const invoiceNumber = `INC-${incident.id}-${Date.now()}`;
-      await db.query(
-        `INSERT INTO invoices (
-          company_id, invoice_number, amount, issue_date, due_date, status,
-          description, category, amount_unpaid,
-          reported_company_gstn, reported_company_name, incident_id, item_sold, reporter_user_id
-        ) VALUES (
-          NULL, $1, $2, $3, $4, $5,
-          $6, $7, $8,
-          $9, $10, $11, $12, $13
-        )`,
-        [
-          invoiceNumber,
-          invoice_amount || amount_involved || null,
-          invoice_date || null,
-          due_date || null,
-          'pending',
-          description || null,
-          incident_type || null,
-          unpaid_amount ?? invoice_amount ?? amount_involved ?? null,
-          company_gstn || null,
-          company_name,
-          incident.id,
-          item_sold || null,
-          reporter_id || null,
-        ]
-      );
-    }
-
-    // 3. Save contact persons to contact_persons table
-    if (Array.isArray(contact_persons) && contact_persons.length > 0) {
-      for (const cp of contact_persons) {
-        if (!cp.name?.trim()) continue;
+    // 2. Save each invoice to incident_invoices table
+    if (Array.isArray(invoiceList) && invoiceList.length > 0) {
+      for (const inv of invoiceList) {
+        const invAmt = inv.invoice_amount ? parseFloat(inv.invoice_amount) : null;
+        const unpAmt = inv.unpaid_amount  ? parseFloat(inv.unpaid_amount)  : null;
+        if (!invAmt && !unpAmt) continue; // skip blank rows
         await db.query(
-          `INSERT INTO contact_persons (name, email, phone, company, position, incident_id, company_gstn)
+          `INSERT INTO incident_invoices
+             (incident_id, invoice_amount, unpaid_amount, invoice_date, due_date, item_sold, currency_code)
            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [
-            cp.name.trim(),
-            cp.email?.trim() || '',
-            cp.phone?.trim() || null,
-            company_name,
-            cp.position?.trim() || null,
             incident.id,
-            company_gstn || null,
+            invAmt,
+            unpAmt,
+            inv.invoice_date || null,
+            inv.due_date     || null,
+            inv.item_sold?.trim() || null,
+            inv.currency_code || currency_code || 'INR',
           ]
         );
       }
     }
 
+    // 3. Upsert contact persons — deduplicate by canonical_phone OR canonical_email.
+    //    If same phone OR email exists: update that row (add this incident linkage notes),
+    //    otherwise insert fresh.
+    if (Array.isArray(contact_persons) && contact_persons.length > 0) {
+      for (const cp of contact_persons) {
+        if (!cp.name?.trim()) continue;
+        const canonPhone = cp.phone ? cp.phone.replace(/\D/g, '').slice(-10) || null : null;
+        const canonEmail = cp.email ? cp.email.trim().toLowerCase() || null : null;
+
+        if (!canonPhone && !canonEmail) {
+          // No dedup key — just insert
+          await db.query(
+            `INSERT INTO contact_persons
+               (name, email, phone, company, company_gstn, position, incident_id, canonical_phone, canonical_email)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+            [cp.name.trim(), cp.email?.trim() || '', cp.phone?.trim() || null,
+             company_name, company_gstn || null, cp.position?.trim() || null,
+             incident.id, null, null]
+          );
+          continue;
+        }
+
+        // Try to find existing record by canonical_phone first, then canonical_email
+        let existingId: number | null = null;
+
+        if (canonPhone) {
+          const chk = await db.query(
+            `SELECT id FROM contact_persons WHERE canonical_phone = $1 LIMIT 1`, [canonPhone]
+          );
+          if (chk.rows[0]) existingId = chk.rows[0].id;
+        }
+        if (!existingId && canonEmail) {
+          const chk = await db.query(
+            `SELECT id FROM contact_persons WHERE canonical_email = $1 LIMIT 1`, [canonEmail]
+          );
+          if (chk.rows[0]) existingId = chk.rows[0].id;
+        }
+
+        if (existingId) {
+          // Merge: update missing fields, keep most recent incident_id
+          await db.query(
+            `UPDATE contact_persons SET
+               name            = COALESCE(NULLIF(name,''),         $1),
+               email           = COALESCE(NULLIF(email,''),        $2),
+               phone           = COALESCE(NULLIF(phone,''),        $3),
+               company         = COALESCE(NULLIF(company,''),      $4),
+               company_gstn    = COALESCE(NULLIF(company_gstn,''), $5),
+               position        = COALESCE(NULLIF(position,''),     $6),
+               canonical_phone = COALESCE(canonical_phone,         $7),
+               canonical_email = COALESCE(canonical_email,         $8),
+               incident_id     = $9
+             WHERE id = $10`,
+            [cp.name.trim(), cp.email?.trim() || '', cp.phone?.trim() || null,
+             company_name, company_gstn || null, cp.position?.trim() || null,
+             canonPhone, canonEmail, incident.id, existingId]
+          );
+        } else {
+          // Fresh insert
+          await db.query(
+            `INSERT INTO contact_persons
+               (name, email, phone, company, company_gstn, position, incident_id, canonical_phone, canonical_email)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+            [cp.name.trim(), cp.email?.trim() || '', cp.phone?.trim() || null,
+             company_name, company_gstn || null, cp.position?.trim() || null,
+             incident.id, canonPhone, canonEmail]
+          );
+        }
+      }
+    }
     return incident;
   }
 

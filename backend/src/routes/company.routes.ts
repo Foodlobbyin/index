@@ -111,9 +111,8 @@ router.get('/view/:id', async (c) => {
 
 /**
  * GET /api/company/view-by-gstn
- * View a reported company's invoices and contact persons.
- * Data comes from the invoices and contact_persons tables (saved on incident submission).
- * Query params: gstn (preferred) OR name
+ * Company profile: all incidents, all invoices from incident_invoices,
+ * and deduplicated contact persons — linked by company_gstn or company_name.
  */
 router.get('/view-by-gstn', async (c) => {
   const db = createDbClient(c.env.DATABASE_URL);
@@ -124,59 +123,77 @@ router.get('/view-by-gstn', async (c) => {
     return c.json({ error: 'Provide gstn or name query parameter.' }, 400);
   }
 
-  // Look up invoices for this reported company
-  const invoiceResult = await db.query(
-    gstn
-      ? `SELECT
-           inv.id, inv.invoice_number, inv.amount, inv.amount_unpaid,
-           inv.issue_date, inv.due_date, inv.status, inv.description,
-           inv.category, inv.item_sold, inv.incident_id,
-           inv.reported_company_gstn, inv.reported_company_name
-         FROM invoices inv
-         WHERE inv.reported_company_gstn = $1
-         ORDER BY inv.issue_date DESC NULLS LAST, inv.created_at DESC`
-      : `SELECT
-           inv.id, inv.invoice_number, inv.amount, inv.amount_unpaid,
-           inv.issue_date, inv.due_date, inv.status, inv.description,
-           inv.category, inv.item_sold, inv.incident_id,
-           inv.reported_company_gstn, inv.reported_company_name
-         FROM invoices inv
-         WHERE LOWER(inv.reported_company_name) = LOWER($1)
-         ORDER BY inv.issue_date DESC NULLS LAST, inv.created_at DESC`,
-    [gstn ? gstn.toUpperCase() : name as string]
+  const param = gstn ? gstn.toUpperCase() : (name as string);
+  const byGstn = !!gstn;
+
+  // Fetch all incidents for this company (approved/submitted/under_review/resolved)
+  const incidentsResult = await db.query(
+    byGstn
+      ? `SELECT id, company_name, company_gstn, incident_type, status, created_at
+         FROM incidents
+         WHERE company_gstn = $1 AND status IN ('approved','submitted','under_review','resolved')
+         ORDER BY created_at DESC`
+      : `SELECT id, company_name, company_gstn, incident_type, status, created_at
+         FROM incidents
+         WHERE LOWER(company_name) = LOWER($1) AND status IN ('approved','submitted','under_review','resolved')
+         ORDER BY created_at DESC`,
+    [param]
   );
 
-  if (invoiceResult.rows.length === 0) {
-    return c.json({ error: 'No invoices found for this company.' }, 404);
+  if (incidentsResult.rows.length === 0) {
+    return c.json({ error: 'No incidents found for this company.' }, 404);
   }
 
-  const companyName: string = invoiceResult.rows[0].reported_company_name;
-  const companyGstn: string = invoiceResult.rows[0].reported_company_gstn || gstn || '';
+  const companyName: string = incidentsResult.rows[0].company_name;
+  const companyGstn: string = incidentsResult.rows[0].company_gstn || gstn || '';
+  const incidentIds: number[] = incidentsResult.rows.map((r: any) => r.id);
 
-  // Look up contact persons for this company (by name or GSTN)
-  const contactResult = await db.query(
-    `SELECT DISTINCT ON (cp.name, cp.email)
-       cp.id, cp.name, cp.email, cp.phone, cp.company, cp.position, cp.company_gstn
+  // Fetch all invoices from incident_invoices for these incidents
+  const invoicesResult = await db.query(
+    `SELECT
+       ii.id, ii.incident_id, ii.invoice_amount, ii.unpaid_amount,
+       ii.invoice_date, ii.due_date, ii.item_sold, ii.currency_code,
+       i.incident_type AS category, i.status AS incident_status
+     FROM incident_invoices ii
+     JOIN incidents i ON i.id = ii.incident_id
+     WHERE ii.incident_id = ANY($1::int[])
+     ORDER BY ii.invoice_date DESC NULLS LAST, ii.created_at DESC`,
+    [incidentIds]
+  );
+
+  // Fetch deduplicated contact persons for this company
+  // Group by canonical_phone OR canonical_email; pick the canonical row per person.
+  const contactsResult = await db.query(
+    `SELECT DISTINCT ON (
+       COALESCE(cp.canonical_phone, cp.canonical_email, cp.id::text)
+     )
+       cp.id, cp.name, cp.email, cp.phone, cp.position, cp.company_gstn,
+       cp.canonical_phone, cp.canonical_email
      FROM contact_persons cp
-     WHERE
-       (cp.company_gstn IS NOT NULL AND cp.company_gstn = $1)
-       OR LOWER(cp.company) = LOWER($2)
-     ORDER BY cp.name, cp.email, cp.created_at DESC`,
-    [companyGstn || '', companyName]
+     WHERE cp.incident_id = ANY($1::int[])
+        OR (cp.company_gstn IS NOT NULL AND cp.company_gstn = $2)
+        OR LOWER(cp.company) = LOWER($3)
+     ORDER BY
+       COALESCE(cp.canonical_phone, cp.canonical_email, cp.id::text),
+       cp.id`,
+    [incidentIds, companyGstn || '', companyName]
   );
 
   // Compute totals
-  const totalUnpaid = invoiceResult.rows
-    .filter((i: any) => i.status !== 'paid')
-    .reduce((sum: number, i: any) => sum + (parseFloat(i.amount_unpaid ?? i.amount) || 0), 0);
+  const totalUnpaid = invoicesResult.rows
+    .filter((i: any) => i.incident_status !== 'resolved')
+    .reduce((sum: number, i: any) => {
+      return sum + parseFloat(i.unpaid_amount ?? i.invoice_amount ?? 0);
+    }, 0);
 
   return c.json({
     company_name: companyName,
     gstn: companyGstn,
-    total_invoices: invoiceResult.rows.length,
+    total_incidents: incidentsResult.rows.length,
+    total_invoices: invoicesResult.rows.length,
     total_unpaid: totalUnpaid,
-    invoices: invoiceResult.rows,
-    contact_persons: contactResult.rows,
+    invoices: invoicesResult.rows,
+    contact_persons: contactsResult.rows,
   });
 });
 
