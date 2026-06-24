@@ -32,9 +32,9 @@ export interface Incident {
   street_address?: string;
   msme_udyam_number?: string;
   incident_type: IncidentType;
-  incident_date: string;
-  incident_title: string;
-  description: string;
+  incident_date?: string;
+  incident_title?: string;
+  description?: string;
   invoice_amount?: number;
   unpaid_amount?: number;
   invoice_date?: string;
@@ -66,9 +66,9 @@ export interface IncidentCreateInput {
   msme_udyam_number?: string;
   // Incident / Invoice Details
   incident_type: IncidentType;
-  incident_date: string;
-  incident_title: string;
-  description: string;
+  incident_date?: string;
+  incident_title?: string;
+  description?: string;
   invoice_amount?: number;
   unpaid_amount?: number;
   invoice_date?: string;
