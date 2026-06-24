@@ -217,7 +217,24 @@ export class IncidentRepository {
 
   async findById(db: DbClient, id: number): Promise<Incident | null> {
     const result = await db.query('SELECT * FROM incidents WHERE id = $1', [id]);
-    return result.rows[0] || null;
+    if (!result.rows[0]) return null;
+    const incident = result.rows[0];
+
+    // Fetch linked invoices
+    const invoicesResult = await db.query(
+      'SELECT * FROM incident_invoices WHERE incident_id = $1 ORDER BY id ASC',
+      [id]
+    );
+    incident.incident_invoices = invoicesResult.rows;
+
+    // Fetch linked contact persons
+    const contactsResult = await db.query(
+      'SELECT * FROM contact_persons WHERE incident_id = $1 ORDER BY id ASC',
+      [id]
+    );
+    incident.contact_persons = contactsResult.rows;
+
+    return incident;
   }
 
   async findByReporterId(db: DbClient, reporterId: number): Promise<Incident[]> {
