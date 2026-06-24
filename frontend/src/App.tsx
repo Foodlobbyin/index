@@ -13,6 +13,7 @@ import PublicLayout from './components/PublicLayout';
 import AppShell from './pages/AppShell';
 import Dashboard from './pages/Dashboard';
 import CompanyProfile from './pages/CompanyProfile';
+import CompanyView from './pages/CompanyView';
 import InsightsPage from './pages/InsightsPage';
 import InvoiceList from './pages/InvoiceList';
 import InvoiceCreatePage from './pages/InvoiceCreatePage';
@@ -56,6 +57,14 @@ export default function App(): JSX.Element {
             element={
               <ProtectedRoute>
                 <CompanyProfile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/company/view/:id"
+            element={
+              <ProtectedRoute>
+                <CompanyView />
               </ProtectedRoute>
             }
           />
