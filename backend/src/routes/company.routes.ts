@@ -10,9 +10,39 @@ const router = new Hono<AppBindings>();
 router.use(authMiddleware);
 
 /**
+ * GET /api/company/lookup?gstn=<GSTN>
+ * Public lookup of a company by GSTN from the master companies table.
+ * Used by ReportIncidentPage Step 1 for auto-fill.
+ * Returns: { company: { gstn, company_name, state, pincode, street_address, msme_udyam_number, industry } }
+ */
+router.get('/lookup', async (c) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+  const gstn = c.req.query('gstn')?.trim().toUpperCase();
+
+  if (!gstn || gstn.length < 10) {
+    return c.json({ error: 'Provide a valid GSTN query parameter.' }, 400);
+  }
+
+  const result = await db.query(
+    `SELECT
+       id, gstn, company_name, state, pincode, street_address,
+       msme_udyam_number, industry, is_registered_member
+     FROM companies
+     WHERE gstn = $1`,
+    [gstn]
+  );
+
+  if (!result.rows[0]) {
+    return c.json({ company: null });
+  }
+
+  return c.json({ company: result.rows[0] });
+});
+
+/**
  * GET /api/company/search
- * Search companies by GSTN (exact) or phone number (partial match)
- * Returns company_profiles joined with users for GSTN/phone data
+ * Search companies by GSTN (exact) or phone number (partial match on contact_persons).
+ * Now queries the master companies table + incident_invoices for totals.
  */
 router.get('/search', async (c) => {
   const db = createDbClient(c.env.DATABASE_URL);
@@ -26,46 +56,64 @@ router.get('/search', async (c) => {
   let rows;
 
   if (gstn) {
-    // Search incidents by GSTN — returns distinct companies that have been reported
+    // Look up company in master companies table, then aggregate incident stats
     const result = await db.query(
       `SELECT
-         MIN(i.id)::int                                     AS company_id,
-         MAX(i.company_name)                               AS company_name,
-         NULL::text                                        AS industry,
-         NULL::text                                        AS city,
-         NULL::text                                        AS country,
-         NULL::int                                         AS reputation_score,
-         i.company_gstn                                    AS gstn,
-         NULL::text                                        AS phone_number,
-         COUNT(*)::int                                     AS invoice_count,
-         COALESCE(SUM(CASE WHEN i.status NOT IN ('resolved') THEN i.amount_involved ELSE 0 END), 0) AS unpaid_amount
-       FROM incidents i
-       WHERE i.company_gstn = $1
-       GROUP BY i.company_gstn
-       ORDER BY company_name`,
+         co.id                                                              AS company_id,
+         co.company_name,
+         co.industry,
+         co.state                                                           AS city,
+         NULL::text                                                         AS country,
+         NULL::int                                                          AS reputation_score,
+         co.gstn,
+         NULL::text                                                         AS phone_number,
+         COUNT(DISTINCT i.id)::int                                          AS invoice_count,
+         COALESCE(SUM(
+           CASE WHEN i.status NOT IN ('resolved')
+             THEN COALESCE(ii_totals.total_unpaid, 0) ELSE 0 END
+         ), 0)                                                              AS unpaid_amount
+       FROM companies co
+       LEFT JOIN incidents i        ON i.company_id = co.id
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(SUM(COALESCE(ii.unpaid_amount, ii.invoice_amount)), 0) AS total_unpaid
+         FROM incident_invoices ii
+         WHERE ii.incident_id = i.id
+       ) ii_totals                  ON TRUE
+       WHERE co.gstn = $1
+       GROUP BY co.id, co.company_name, co.industry, co.state, co.gstn`,
       [gstn.toUpperCase()]
     );
     rows = result.rows;
   } else {
-    // Search contact_persons by phone, then find matching incidents by company name
+    // Search contact_persons by phone, find their incidents, then return the companies
     const clean = (phone as string).replace(/\D/g, '');
     const result = await db.query(
       `SELECT
-         MIN(i.id)::int                                     AS company_id,
-         MAX(i.company_name)                               AS company_name,
-         NULL::text                                        AS industry,
-         NULL::text                                        AS city,
-         NULL::text                                        AS country,
-         NULL::int                                         AS reputation_score,
-         i.company_gstn                                    AS gstn,
-         cp_sub.phone                                      AS phone_number,
-         COUNT(DISTINCT i.id)::int                         AS invoice_count,
-         COALESCE(SUM(CASE WHEN i.status NOT IN ('resolved') THEN i.amount_involved ELSE 0 END), 0) AS unpaid_amount
-       FROM incidents i
-       JOIN contact_persons cp_sub ON LOWER(cp_sub.company) = LOWER(i.company_name)
+         co.id                                                              AS company_id,
+         co.company_name,
+         co.industry,
+         co.state                                                           AS city,
+         NULL::text                                                         AS country,
+         NULL::int                                                          AS reputation_score,
+         co.gstn,
+         cp_sub.phone                                                       AS phone_number,
+         COUNT(DISTINCT i.id)::int                                          AS invoice_count,
+         COALESCE(SUM(
+           CASE WHEN i.status NOT IN ('resolved')
+             THEN COALESCE(ii_totals.total_unpaid, 0) ELSE 0 END
+         ), 0)                                                              AS unpaid_amount
+       FROM contact_persons cp_sub
+       JOIN incidents i             ON i.id = cp_sub.incident_id
+       JOIN companies co            ON co.id = i.company_id
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(SUM(COALESCE(ii.unpaid_amount, ii.invoice_amount)), 0) AS total_unpaid
+         FROM incident_invoices ii
+         WHERE ii.incident_id = i.id
+       ) ii_totals                  ON TRUE
        WHERE REGEXP_REPLACE(COALESCE(cp_sub.phone, ''), '[^0-9]', '', 'g') LIKE $1
-       GROUP BY i.company_gstn, cp_sub.phone
-       ORDER BY company_name
+          OR cp_sub.canonical_phone LIKE $1
+       GROUP BY co.id, co.company_name, co.industry, co.state, co.gstn, cp_sub.phone
+       ORDER BY co.company_name
        LIMIT 20`,
       [`%${clean}%`]
     );
@@ -77,7 +125,7 @@ router.get('/search', async (c) => {
 
 /**
  * GET /api/company/view/:id
- * Public company view by company_profiles.id (for search result navigation)
+ * Public company view by company_profiles.id (for registered member profile).
  */
 router.get('/view/:id', async (c) => {
   const db = createDbClient(c.env.DATABASE_URL);
@@ -111,8 +159,9 @@ router.get('/view/:id', async (c) => {
 
 /**
  * GET /api/company/view-by-gstn
- * Company profile: all incidents, all invoices from incident_invoices,
- * and deduplicated contact persons — linked by company_gstn or company_name.
+ * Company profile page: all incidents, all invoices from incident_invoices,
+ * and deduplicated contact persons.
+ * Now uses the master companies table as the anchor.
  */
 router.get('/view-by-gstn', async (c) => {
   const db = createDbClient(c.env.DATABASE_URL);
@@ -123,32 +172,47 @@ router.get('/view-by-gstn', async (c) => {
     return c.json({ error: 'Provide gstn or name query parameter.' }, 400);
   }
 
-  const param = gstn ? gstn.toUpperCase() : (name as string);
-  const byGstn = !!gstn;
+  // Step 1: Resolve company from master table
+  let companyRow: any = null;
+  if (gstn) {
+    const r = await db.query(
+      `SELECT id, gstn, company_name, state, pincode, street_address, msme_udyam_number, industry, is_registered_member
+       FROM companies WHERE gstn = $1`,
+      [gstn.toUpperCase()]
+    );
+    companyRow = r.rows[0] || null;
+  } else {
+    const r = await db.query(
+      `SELECT id, gstn, company_name, state, pincode, street_address, msme_udyam_number, industry, is_registered_member
+       FROM companies WHERE LOWER(TRIM(company_name)) = LOWER(TRIM($1)) ORDER BY id LIMIT 1`,
+      [name as string]
+    );
+    companyRow = r.rows[0] || null;
+  }
 
-  // Fetch all incidents for this company (approved/submitted/under_review/resolved)
+  if (!companyRow) {
+    return c.json({ error: 'Company not found.' }, 404);
+  }
+
+  const companyId: number = companyRow.id;
+
+  // Step 2: Fetch all approved/visible incidents for this company
   const incidentsResult = await db.query(
-    byGstn
-      ? `SELECT id, company_name, company_gstn, incident_type, status, created_at
-         FROM incidents
-         WHERE company_gstn = $1 AND status IN ('approved','submitted','under_review','resolved')
-         ORDER BY created_at DESC`
-      : `SELECT id, company_name, company_gstn, incident_type, status, created_at
-         FROM incidents
-         WHERE LOWER(company_name) = LOWER($1) AND status IN ('approved','submitted','under_review','resolved')
-         ORDER BY created_at DESC`,
-    [param]
+    `SELECT id, company_name, company_gstn, incident_type, status, created_at
+     FROM incidents
+     WHERE company_id = $1
+       AND status IN ('approved', 'submitted', 'under_review', 'resolved')
+     ORDER BY created_at DESC`,
+    [companyId]
   );
 
   if (incidentsResult.rows.length === 0) {
     return c.json({ error: 'No incidents found for this company.' }, 404);
   }
 
-  const companyName: string = incidentsResult.rows[0].company_name;
-  const companyGstn: string = incidentsResult.rows[0].company_gstn || gstn || '';
   const incidentIds: number[] = incidentsResult.rows.map((r: any) => r.id);
 
-  // Fetch all invoices from incident_invoices for these incidents
+  // Step 3: All invoices from incident_invoices for these incidents
   const invoicesResult = await db.query(
     `SELECT
        ii.id, ii.incident_id, ii.invoice_amount, ii.unpaid_amount,
@@ -161,8 +225,7 @@ router.get('/view-by-gstn', async (c) => {
     [incidentIds]
   );
 
-  // Fetch deduplicated contact persons for this company
-  // Group by canonical_phone OR canonical_email; pick the canonical row per person.
+  // Step 4: Deduplicated contact persons linked to this company's incidents
   const contactsResult = await db.query(
     `SELECT DISTINCT ON (
        COALESCE(cp.canonical_phone, cp.canonical_email, cp.id::text)
@@ -171,15 +234,13 @@ router.get('/view-by-gstn', async (c) => {
        cp.canonical_phone, cp.canonical_email
      FROM contact_persons cp
      WHERE cp.incident_id = ANY($1::int[])
-        OR (cp.company_gstn IS NOT NULL AND cp.company_gstn = $2)
-        OR LOWER(cp.company) = LOWER($3)
      ORDER BY
        COALESCE(cp.canonical_phone, cp.canonical_email, cp.id::text),
        cp.id`,
-    [incidentIds, companyGstn || '', companyName]
+    [incidentIds]
   );
 
-  // Compute totals
+  // Step 5: Compute totals
   const totalUnpaid = invoicesResult.rows
     .filter((i: any) => i.incident_status !== 'resolved')
     .reduce((sum: number, i: any) => {
@@ -187,8 +248,9 @@ router.get('/view-by-gstn', async (c) => {
     }, 0);
 
   return c.json({
-    company_name: companyName,
-    gstn: companyGstn,
+    company: companyRow,
+    company_name: companyRow.company_name,
+    gstn: companyRow.gstn || '',
     total_incidents: incidentsResult.rows.length,
     total_invoices: invoicesResult.rows.length,
     total_unpaid: totalUnpaid,

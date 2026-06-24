@@ -1,6 +1,7 @@
 import React, { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { incidentService, IncidentCreateInput, IncidentType } from '../services/incidentService';
+import api from '../services/api';
 
 const INCIDENT_TYPES: { value: IncidentType; label: string }[] = [
   { value: 'FRAUD', label: 'Fraud' },
@@ -71,6 +72,12 @@ const ReportIncidentPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // GSTN auto-fill state
+  const [gstnLookupStatus, setGstnLookupStatus] = useState<'idle' | 'loading' | 'found' | 'not_found'>('idle');
+
+  // Per-contact phone lookup status (index → status)
+  const [phoneLookupStatus, setPhoneLookupStatus] = useState<Record<number, 'idle' | 'loading' | 'found' | 'not_found'>>({});
+
   const [formData, setFormData] = useState<FormData>({
     company_gstn: '',
     company_name: '',
@@ -91,6 +98,37 @@ const ReportIncidentPage: React.FC = () => {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    // Reset GSTN lookup if user clears/changes the GSTN field
+    if (name === 'company_gstn') {
+      setGstnLookupStatus('idle');
+    }
+  };
+
+  // ── GSTN blur → auto-fill from companies table ────────────────────────────
+  const handleGstnBlur = async () => {
+    const gstn = formData.company_gstn.trim().toUpperCase();
+    if (gstn.length < 10) return;
+    setGstnLookupStatus('loading');
+    try {
+      const res = await api.get('/company/lookup', { params: { gstn } });
+      const company = res.data?.company;
+      if (company) {
+        setFormData((prev) => ({
+          ...prev,
+          company_gstn: company.gstn ?? prev.company_gstn,
+          company_name: company.company_name ?? prev.company_name,
+          state: company.state ?? prev.state,
+          pincode: company.pincode ?? prev.pincode,
+          street_address: company.street_address ?? prev.street_address,
+          msme_udyam_number: company.msme_udyam_number ?? prev.msme_udyam_number,
+        }));
+        setGstnLookupStatus('found');
+      } else {
+        setGstnLookupStatus('not_found');
+      }
+    } catch {
+      setGstnLookupStatus('not_found');
+    }
   };
 
   // ── Invoice row handlers ──────────────────────────────────────────────────
@@ -120,6 +158,39 @@ const ReportIncidentPage: React.FC = () => {
       updated[index] = { ...updated[index], [field]: value };
       return { ...prev, contact_persons: updated };
     });
+    // Reset phone lookup if user changes the phone field
+    if (field === 'phone') {
+      setPhoneLookupStatus((prev) => ({ ...prev, [index]: 'idle' }));
+    }
+  };
+
+  // ── Contact phone blur → auto-fill from contact_persons table ─────────────
+  const handleContactPhoneBlur = async (index: number) => {
+    const phone = formData.contact_persons[index].phone.trim();
+    if (phone.replace(/\D/g, '').length < 5) return;
+    setPhoneLookupStatus((prev) => ({ ...prev, [index]: 'loading' }));
+    try {
+      const res = await api.get('/contact/lookup', { params: { phone } });
+      const contact = res.data?.contact;
+      if (contact) {
+        setFormData((prev) => {
+          const updated = [...prev.contact_persons];
+          updated[index] = {
+            ...updated[index],
+            name: contact.name ?? updated[index].name,
+            position: contact.position ?? updated[index].position,
+            email: contact.email ?? updated[index].email,
+            phone: contact.phone ?? updated[index].phone,
+          };
+          return { ...prev, contact_persons: updated };
+        });
+        setPhoneLookupStatus((prev) => ({ ...prev, [index]: 'found' }));
+      } else {
+        setPhoneLookupStatus((prev) => ({ ...prev, [index]: 'not_found' }));
+      }
+    } catch {
+      setPhoneLookupStatus((prev) => ({ ...prev, [index]: 'not_found' }));
+    }
   };
 
   const addContact = () => {
@@ -139,7 +210,7 @@ const ReportIncidentPage: React.FC = () => {
   // ── Step navigation ───────────────────────────────────────────────────────
   const goNext = () => {
     setError(null);
-    if (step === 2 && !formData.description.trim()) {
+    if (step === 2 && !(formData.description ?? '').trim()) {
       setError('Description is required. Please describe the incident.');
       return;
     }
@@ -281,9 +352,28 @@ const ReportIncidentPage: React.FC = () => {
 
               <div>
                 <label className={labelClass}>Company GSTIN <span className="text-red-500">*</span></label>
-                <input type="text" name="company_gstn" className={inputClass}
-                  value={formData.company_gstn} onChange={handleChange}
-                  placeholder="e.g. 29ABCDE1234F1Z5" required maxLength={15} />
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="company_gstn"
+                    className={`${inputClass} ${gstnLookupStatus === 'found' ? 'border-green-400 bg-green-50' : ''}`}
+                    value={formData.company_gstn}
+                    onChange={handleChange}
+                    onBlur={handleGstnBlur}
+                    placeholder="e.g. 29ABCDE1234F1Z5"
+                    required
+                    maxLength={15}
+                  />
+                  {gstnLookupStatus === 'loading' && (
+                    <span className="absolute right-3 top-2.5 text-xs text-gray-400">Looking up…</span>
+                  )}
+                  {gstnLookupStatus === 'found' && (
+                    <span className="absolute right-3 top-2.5 text-xs text-green-600 font-medium">✓ Company found — details auto-filled</span>
+                  )}
+                  {gstnLookupStatus === 'not_found' && (
+                    <span className="absolute right-3 top-2.5 text-xs text-gray-400">New company — please fill details below</span>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -328,7 +418,7 @@ const ReportIncidentPage: React.FC = () => {
           {/* ═══════════════ STEP 2 – INVOICE DETAILS (multi-row) ══════════ */}
           {step === 2 && (
             <>
-              <p className={sectionTitle}>Incident & Invoice Details</p>
+              <p className={sectionTitle}>Incident &amp; Invoice Details</p>
 
               {/* Privacy Disclaimer */}
               <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
@@ -336,7 +426,7 @@ const ReportIncidentPage: React.FC = () => {
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                 </svg>
                 <p>
-                  <span className="font-semibold">Your identity is always protected.</span> Only the reported company's details and financial figures are visible to other users — never who submitted this report.
+                  <span className="font-semibold">Your identity is always protected.</span> Only the reported company&apos;s details and financial figures are visible to other users — never who submitted this report.
                 </p>
               </div>
 
@@ -449,38 +539,75 @@ const ReportIncidentPage: React.FC = () => {
               <p className={sectionTitle}>Contact Persons</p>
               <p className="text-sm text-gray-500 -mt-3 mb-4">
                 Add the individuals involved in this deal at the reported company.
+                Enter a phone number and their details will be auto-filled if already in our database.
                 These names will be visible on the company profile to warn others.
               </p>
 
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {formData.contact_persons.map((contact, index) => (
                   <div
                     key={index}
-                    className="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2"
+                    className={`border rounded-lg p-3 bg-gray-50 ${phoneLookupStatus[index] === 'found' ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
                   >
-                    <span className="text-xs font-semibold text-gray-400 w-5 shrink-0">{index + 1}.</span>
-                    <input type="text" className={`${inputClass} flex-1 min-w-0`}
-                      placeholder="Full Name" value={contact.name}
-                      onChange={(e) => handleContactChange(index, 'name', e.target.value)}
-                      required={index === 0} />
-                    <input type="text" className={`${inputClass} flex-1 min-w-0`}
-                      placeholder="Position / Role" value={contact.position}
-                      onChange={(e) => handleContactChange(index, 'position', e.target.value)} />
-                    <input type="email" className={`${inputClass} flex-1 min-w-0`}
-                      placeholder="Email" value={contact.email}
-                      onChange={(e) => handleContactChange(index, 'email', e.target.value)} />
-                    <input type="tel" className={`${inputClass} flex-1 min-w-0`}
-                      placeholder="Phone Number" value={contact.phone}
-                      onChange={(e) => handleContactChange(index, 'phone', e.target.value)} />
-                    {formData.contact_persons.length > 1 && (
-                      <button type="button" onClick={() => removeContact(index)}
-                        className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-red-100 text-red-500 hover:bg-red-200 transition-colors"
-                        title="Remove contact">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Contact {index + 1}
+                        {phoneLookupStatus[index] === 'found' && (
+                          <span className="ml-2 text-green-600 normal-case font-normal">✓ Details auto-filled from database</span>
+                        )}
+                        {phoneLookupStatus[index] === 'loading' && (
+                          <span className="ml-2 text-gray-400 normal-case font-normal">Looking up…</span>
+                        )}
+                      </span>
+                      {formData.contact_persons.length > 1 && (
+                        <button type="button" onClick={() => removeContact(index)}
+                          className="w-7 h-7 flex items-center justify-center rounded-full bg-red-100 text-red-500 hover:bg-red-200 transition-colors"
+                          title="Remove contact">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {/* Phone first so lookup fires before other fields */}
+                      <div>
+                        <label className={labelClass}>Phone Number</label>
+                        <input
+                          type="tel"
+                          className={inputClass}
+                          placeholder="Phone — auto-fills other fields"
+                          value={contact.phone}
+                          onChange={(e) => handleContactChange(index, 'phone', e.target.value)}
+                          onBlur={() => handleContactPhoneBlur(index)}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Full Name {index === 0 && <span className="text-red-500">*</span>}</label>
+                        <input
+                          type="text"
+                          className={inputClass}
+                          placeholder="Full Name"
+                          value={contact.name}
+                          onChange={(e) => handleContactChange(index, 'name', e.target.value)}
+                          required={index === 0}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Position / Role</label>
+                        <input type="text" className={inputClass}
+                          placeholder="e.g. Proprietor, Sales Manager"
+                          value={contact.position}
+                          onChange={(e) => handleContactChange(index, 'position', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Email</label>
+                        <input type="email" className={inputClass}
+                          placeholder="Email"
+                          value={contact.email}
+                          onChange={(e) => handleContactChange(index, 'email', e.target.value)} />
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

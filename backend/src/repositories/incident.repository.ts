@@ -12,6 +12,10 @@ export class IncidentRepository {
     const {
       company_gstn,
       company_name,
+      state,
+      pincode,
+      street_address,
+      msme_udyam_number,
       incident_type,
       incident_date,
       incident_title,
@@ -27,16 +31,79 @@ export class IncidentRepository {
       contact_persons,            // array of contact person objects from Step 3
     } = data as any;
 
+    // 0. Resolve or create a companies record for this company.
+    //    Priority: match by GSTN (exact), then by name (case-insensitive).
+    let companyId: number | null = null;
+
+    const normalGstn = company_gstn ? company_gstn.trim().toUpperCase() : null;
+
+    if (normalGstn) {
+      // Try lookup by GSTN
+      const existing = await db.query(
+        `SELECT id FROM companies WHERE gstn = $1`, [normalGstn]
+      );
+      if (existing.rows[0]) {
+        companyId = existing.rows[0].id;
+        // Update any missing fields (state, pincode, etc.) while we have them
+        await db.query(
+          `UPDATE companies SET
+             company_name   = COALESCE(NULLIF(company_name,''), $2),
+             state          = COALESCE(state, $3),
+             pincode        = COALESCE(pincode, $4),
+             street_address = COALESCE(street_address, $5),
+             msme_udyam_number = COALESCE(msme_udyam_number, $6),
+             updated_at     = NOW()
+           WHERE id = $1`,
+          [companyId, company_name || null, state || null, pincode || null,
+           street_address || null, msme_udyam_number || null]
+        );
+      } else {
+        // Insert new companies row
+        const ins = await db.query(
+          `INSERT INTO companies (gstn, company_name, state, pincode, street_address, msme_udyam_number, is_registered_member)
+           VALUES ($1, $2, $3, $4, $5, $6, FALSE)
+           ON CONFLICT (gstn) DO UPDATE SET
+             company_name   = EXCLUDED.company_name,
+             state          = COALESCE(companies.state, EXCLUDED.state),
+             pincode        = COALESCE(companies.pincode, EXCLUDED.pincode),
+             street_address = COALESCE(companies.street_address, EXCLUDED.street_address),
+             msme_udyam_number = COALESCE(companies.msme_udyam_number, EXCLUDED.msme_udyam_number),
+             updated_at     = NOW()
+           RETURNING id`,
+          [normalGstn, company_name, state || null, pincode || null,
+           street_address || null, msme_udyam_number || null]
+        );
+        companyId = ins.rows[0].id;
+      }
+    } else {
+      // No GSTN — match by company name (case-insensitive, gstn IS NULL)
+      const byName = await db.query(
+        `SELECT id FROM companies WHERE LOWER(TRIM(company_name)) = LOWER(TRIM($1)) AND gstn IS NULL ORDER BY id LIMIT 1`,
+        [company_name]
+      );
+      if (byName.rows[0]) {
+        companyId = byName.rows[0].id;
+      } else {
+        const ins = await db.query(
+          `INSERT INTO companies (gstn, company_name, state, pincode, street_address, msme_udyam_number, is_registered_member)
+           VALUES (NULL, $1, $2, $3, $4, $5, FALSE) RETURNING id`,
+          [company_name, state || null, pincode || null, street_address || null, msme_udyam_number || null]
+        );
+        companyId = ins.rows[0].id;
+      }
+    }
+
     // 1. Insert the incident record
     const result = await db.query(
       `INSERT INTO incidents (
-        company_gstn, company_name, incident_type, incident_date, incident_title,
+        company_id, company_gstn, company_name, incident_type, incident_date, incident_title,
         description, amount_involved, currency_code, status, is_anonymous,
         reporter_id, reporter_name, reporter_email, reporter_phone
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft',$9,$10,$11,$12,$13)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'draft',$10,$11,$12,$13,$14)
       RETURNING *`,
       [
-        company_gstn || null,
+        companyId,
+        normalGstn || null,
         company_name,
         incident_type,
         incident_date,

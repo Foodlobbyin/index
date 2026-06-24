@@ -7,6 +7,35 @@ const router = new Hono<AppBindings>();
 router.use(authMiddleware);
 
 /**
+ * GET /api/contact/lookup?phone=<number>
+ * Look up a single contact person by exact phone for Step 3 auto-fill.
+ * Returns the first matching contact person (deduplicated by canonical_phone).
+ */
+router.get('/lookup', async (c) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+  const raw = c.req.query('phone')?.replace(/\D/g, '') || '';
+  if (raw.length < 5) {
+    return c.json({ contact: null });
+  }
+  // Match last 10 digits (canonical form)
+  const canon = raw.slice(-10);
+
+  const result = await db.query(
+    `SELECT DISTINCT ON (COALESCE(cp.canonical_phone, cp.canonical_email, cp.id::text))
+       cp.id, cp.name, cp.email, cp.phone, cp.position,
+       cp.company, cp.company_gstn, cp.canonical_phone, cp.canonical_email
+     FROM contact_persons cp
+     WHERE cp.canonical_phone = $1
+        OR REGEXP_REPLACE(COALESCE(cp.phone,''), '[^0-9]', '', 'g') LIKE $2
+     ORDER BY COALESCE(cp.canonical_phone, cp.canonical_email, cp.id::text), cp.id
+     LIMIT 1`,
+    [canon, `%${canon}`]
+  );
+
+  return c.json({ contact: result.rows[0] || null });
+});
+
+/**
  * GET /api/contact/search?phone=<number>
  * Search contact persons by phone number (partial match on canonical_phone or phone).
  * Returns deduplicated persons. Same phone = same person.
