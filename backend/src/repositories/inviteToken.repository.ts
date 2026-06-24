@@ -60,7 +60,7 @@ export class InviteTokenRepository {
     return { valid: true, invite };
   }
 
-  async markUsed(db: DbClient, id: number, used_by_user_id: number): Promise<void> {
+  async markUsed(db: DbClient, id: number, used_by_user_id: number | null): Promise<void> {
     await db.query(
       `UPDATE invite_tokens SET status = 'used', used_at = NOW(), used_by_user_id = $1 WHERE id = $2`,
       [used_by_user_id, id]
