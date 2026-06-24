@@ -16,14 +16,30 @@ export type IncidentStatus =
   | 'rejected'
   | 'resolved';
 
+export interface ContactPerson {
+  name: string;
+  position?: string;
+  email?: string;
+  phone?: string;
+}
+
 export interface Incident {
   id: number;
   company_gstn?: string;
   company_name: string;
+  state?: string;
+  pincode?: string;
+  street_address?: string;
+  msme_udyam_number?: string;
   incident_type: IncidentType;
   incident_date: string;
   incident_title: string;
   description: string;
+  invoice_amount?: number;
+  unpaid_amount?: number;
+  invoice_date?: string;
+  due_date?: string;
+  item_sold?: string;
   amount_involved?: number;
   currency_code: string;
   reporter_id?: number;
@@ -35,29 +51,52 @@ export interface Incident {
   reviewed_by?: number;
   reviewed_at?: string;
   rejection_reason?: string;
+  contact_persons?: ContactPerson[];
   created_at: string;
   updated_at: string;
 }
 
 export interface IncidentCreateInput {
+  // Company Details
   company_gstn?: string;
   company_name: string;
+  state?: string;
+  pincode?: string;
+  street_address?: string;
+  msme_udyam_number?: string;
+  // Incident / Invoice Details
   incident_type: IncidentType;
   incident_date: string;
   incident_title: string;
   description: string;
+  invoice_amount?: number;
+  unpaid_amount?: number;
+  invoice_date?: string;
+  due_date?: string;
+  item_sold?: string;
   amount_involved?: number;
   currency_code?: string;
   is_anonymous?: boolean;
+  // Contact Persons
+  contact_persons?: ContactPerson[];
 }
 
 export interface IncidentUpdateInput {
   company_gstn?: string;
   company_name?: string;
+  state?: string;
+  pincode?: string;
+  street_address?: string;
+  msme_udyam_number?: string;
   incident_type?: IncidentType;
   incident_date?: string;
   incident_title?: string;
   description?: string;
+  invoice_amount?: number;
+  unpaid_amount?: number;
+  invoice_date?: string;
+  due_date?: string;
+  item_sold?: string;
   amount_involved?: number;
   currency_code?: string;
 }
