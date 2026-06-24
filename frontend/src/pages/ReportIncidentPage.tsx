@@ -117,6 +117,11 @@ const ReportIncidentPage: React.FC = () => {
 
   const goNext = () => {
     setError(null);
+    // Step 2 validation — Description is mandatory
+    if (step === 2 && !formData.description.trim()) {
+      setError('Description is required. Please enter details about the incident in the Description field above.');
+      return;
+    }
     setStep((s) => Math.min(s + 1, TOTAL_STEPS));
   };
 
@@ -448,15 +453,16 @@ const ReportIncidentPage: React.FC = () => {
                 />
               </div>
 
-              {/* Description (optional but backend requires it) */}
+              {/* Description — mandatory */}
               <div>
-                <label className={labelClass}>Additional Details</label>
+                <label className={labelClass}>Description <span className="text-red-500">*</span></label>
                 <textarea
                   name="description"
                   className={`${inputClass} resize-y min-h-[80px]`}
                   value={formData.description ?? ''}
                   onChange={handleChange}
-                  placeholder="Any additional context about the incident (optional)"
+                  placeholder="Describe the incident — payment default, bounced cheque, etc."
+                  required
                 />
               </div>
 
