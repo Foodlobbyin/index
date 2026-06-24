@@ -1,58 +1,25 @@
-// @ts-nocheck — Deferred: filesystem-based evidence storage is not Workers-compatible. Re-implement with R2 in a later phase.
-import fs from 'fs';
-import incidentEvidenceRepository from '../repositories/incidentEvidence.repository';
-import { IncidentEvidence, EvidenceCreateInput } from '../models/IncidentEvidence';
+// Phase 2: filesystem evidence storage will be replaced with Cloudflare R2
+// Stub so the bundler does not try to resolve fs
 
-const MAX_FILES = parseInt(process.env.MAX_FILES_PER_INCIDENT || '3', 10);
+import incidentEvidenceRepository from '../repositories/incidentEvidence.repository';
+import type { DbClient } from '../config/database';
+import type { IncidentEvidence } from '../models/IncidentEvidence';
 
 export class EvidenceService {
-  async addEvidence(
-    files: Express.Multer.File[],
-    incidentId: number,
-    uploadedBy?: number
-  ): Promise<IncidentEvidence[]> {
-    const existing = await incidentEvidenceRepository.countByIncidentId(incidentId);
-    if (existing + files.length > MAX_FILES) {
-      // Clean up uploaded files
-      for (const file of files) {
-        if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
-      }
-      throw new Error(`Maximum ${MAX_FILES} evidence files allowed per incident`);
-    }
-
-    const saved: IncidentEvidence[] = [];
-    for (const file of files) {
-      const data: EvidenceCreateInput = {
-        incident_id: incidentId,
-        file_name: file.filename,
-        original_name: file.originalname,
-        file_path: file.path,
-        file_size: file.size,
-        mime_type: file.mimetype,
-        uploaded_by: uploadedBy,
-      };
-      const evidence = await incidentEvidenceRepository.create(data);
-      saved.push(evidence);
-    }
-    return saved;
+  async addEvidence(_files: any[], _incidentId: number, _uploadedBy?: number): Promise<IncidentEvidence[]> {
+    throw new Error('Evidence upload not yet implemented — Phase 2 (R2)');
   }
 
-  async getEvidenceList(incidentId: number): Promise<IncidentEvidence[]> {
-    return incidentEvidenceRepository.findByIncidentId(incidentId);
+  async getEvidenceList(db: DbClient, incidentId: number): Promise<IncidentEvidence[]> {
+    return incidentEvidenceRepository.findByIncidentId(db, incidentId);
   }
 
-  async getEvidenceById(id: number): Promise<IncidentEvidence | null> {
-    return incidentEvidenceRepository.findById(id);
+  async getEvidenceById(db: DbClient, id: number): Promise<IncidentEvidence | null> {
+    return incidentEvidenceRepository.findById(db, id);
   }
 
-  async deleteEvidence(id: number): Promise<void> {
-    const evidence = await incidentEvidenceRepository.findById(id);
-    if (!evidence) throw new Error('Evidence not found');
-
-    if (fs.existsSync(evidence.file_path)) {
-      fs.unlinkSync(evidence.file_path);
-    }
-    await incidentEvidenceRepository.delete(id);
+  async deleteEvidence(_db: DbClient, _id: number): Promise<void> {
+    throw new Error('Evidence delete not yet implemented — Phase 2 (R2)');
   }
 }
 
