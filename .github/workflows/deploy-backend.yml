@@ -1,64 +1,19 @@
-name: Deploy Backend to Catalyst AppSail
+# Backend is deployed to Cloudflare Workers via deploy-worker.yml
+# This Catalyst AppSail workflow is disabled — backend has migrated to Cloudflare Workers.
+# Kept as documentation only.
+
+name: Deploy Backend to Catalyst AppSail (DISABLED)
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'This workflow is disabled. Backend runs on Cloudflare Workers.'
+        required: true
 
 jobs:
-  deploy:
+  disabled:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm install
-        working-directory: ./backend
-
-      - name: Build TypeScript
-        run: npm run build
-        working-directory: ./backend
-
-      - name: Install Catalyst CLI
-        run: npm install -g zcatalyst-cli
-
-      - name: Get Catalyst Access Token
-        id: get_token
-        run: |
-          RESPONSE=$(curl -s -X POST "https://accounts.zoho.in/oauth/v2/token" \
-            -d "grant_type=authorization_code" \
-            -d "code=1000.84a2ae2123184e955c8f0351855989c1.b5f367e4f3f8ada0f98a0da9eb33e1d2" \
-            -d "client_id=1000.Z5XO65U7IDI2YQ8O0S4E3N2S77MZVV" \
-            -d "client_secret=b73771a18bbc64eac2974585ecda8953f37ee89516")
-          echo "FULL_RESPONSE=$RESPONSE"
-          ACCESS_TOKEN=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('access_token','NONE'))")
-          REFRESH_TOKEN=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('refresh_token','NONE'))")
-          echo "ACCESS_TOKEN=$ACCESS_TOKEN"
-          echo "REFRESH_TOKEN=$REFRESH_TOKEN"
-          echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
-        shell: /usr/bin/bash {0}
-
-      - name: Copy catalyst.json to backend/dist
-        run: cp catalyst.json backend/dist/
-
-      - name: Deploy to AppSail
-        run: |
-          catalyst deploy appsail \
-            --name foodlobby-backend \
-            --stack NodeJS20 \
-            --command "node index.js" \
-            --org ${{ secrets.CATALYST_ACCOUNT_ID }} \
-            --project ${{ secrets.CATALYST_PROJECT_ID }} \
-            --token ${{ steps.get_token.outputs.access_token }}
-        working-directory: ./backend/dist
-        shell: /usr/bin/bash {0}
+      - name: Notice
+        run: echo "This workflow is disabled. Backend is deployed via Cloudflare Workers (deploy-worker.yml)."
