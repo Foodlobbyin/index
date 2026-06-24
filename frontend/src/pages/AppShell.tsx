@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { Link, Navigate, NavLink, Routes, Route, useLocation } from 'react-router-dom';
-import { Search, MessageSquare, LogOut, User, ClipboardList, AlertTriangle, Shield, FileText, Settings, KeyRound, BookOpen } from 'lucide-react';
+import { Search, MessageSquare, LogOut, User, ClipboardList, Shield, FileText, Settings, KeyRound, BookOpen } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Tabs from '../components/ui/Tabs';
 import SearchSubmitSection from '../components/app/SearchSubmitSection';
 import ForumSection from '../components/app/ForumSection';
 import AuditLogPage from './AuditLogPage';
-import IncidentListPage from './IncidentListPage';
 import ReportIncidentPage from './ReportIncidentPage';
 import IncidentDetailPage from './IncidentDetailPage';
 import ModerationQueuePage from './ModerationQueuePage';
@@ -43,7 +42,6 @@ const AppShell: React.FC = () => {
         : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
     }`;
 
-  // Dashboard view is active when not on a sub-route
   const isDashboard =
     location.pathname === '/app' || location.pathname === '/app/';
 
@@ -73,10 +71,6 @@ const AppShell: React.FC = () => {
                 <Search size={16} />
                 <span>Dashboard</span>
               </NavLink>
-              <NavLink to="/app/incidents" className={navLinkClass}>
-                <AlertTriangle size={16} />
-                <span>Incidents</span>
-              </NavLink>
               <NavLink to="/app/my-incidents" className={navLinkClass}>
                 <BookOpen size={16} />
                 <span>My Reports</span>
@@ -89,7 +83,7 @@ const AppShell: React.FC = () => {
               )}
               <NavLink to="/app/invoices" className={navLinkClass}>
                 <FileText size={16} />
-                <span>Invoices</span>
+                <span>My Defaults</span>
               </NavLink>
               {isAdmin && (
                 <a
@@ -174,7 +168,7 @@ const AppShell: React.FC = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">
         <Routes>
-          {/* Dashboard (search, forum, audit logs) */}
+          {/* Dashboard (search + forum + audit logs) */}
           <Route
             index
             element={
@@ -191,11 +185,10 @@ const AppShell: React.FC = () => {
               </Tabs>
             }
           />
-          {/* Incidents */}
-          <Route path="incidents" element={<IncidentListPage />} />
+          {/* Incident report form & detail — accessed from My Reports */}
           <Route path="incidents/new" element={<ReportIncidentPage />} />
           <Route path="incidents/:id" element={<IncidentDetailPage />} />
-          {/* My Incidents */}
+          {/* My Reports */}
           <Route path="my-incidents" element={<MyIncidentsPage />} />
           {/* Moderation */}
           <Route
