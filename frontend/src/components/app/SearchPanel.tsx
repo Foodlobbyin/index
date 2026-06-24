@@ -23,7 +23,7 @@ interface SearchResult {
 
 const SearchPanel: React.FC = () => {
   const navigate = useNavigate();
-  const [searchType, setSearchType] = useState<'gstin' | 'phone' | 'name'>('gstin');
+  const [searchType, setSearchType] = useState<'gstin' | 'phone'>('gstin');
   const [searchValue, setSearchValue] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,40 +42,10 @@ const SearchPanel: React.FC = () => {
     try {
       const params = searchType === 'gstin'
         ? { gstn: searchValue.trim().toUpperCase() }
-        : searchType === 'phone'
-        ? { phone: searchValue.trim() }
-        : { name: searchValue.trim() };
+        : { phone: searchValue.trim() };
 
-      const endpoint = searchType === 'name' ? '/incident/search' : '/company/search';
-      const response = await api.get(endpoint, { params });
-      // incident/search returns { incidents } array, normalize to same shape
-      if (searchType === 'name') {
-        const incidents = response.data.incidents || [];
-        // Deduplicate by GSTN and aggregate
-        const byGstn: Record<string, SearchResult> = {};
-        for (const inc of incidents) {
-          const key = inc.company_gstn || inc.company_name;
-          if (!byGstn[key]) {
-            byGstn[key] = {
-              company_id: inc.id,
-              company_name: inc.company_name,
-              gstn: inc.company_gstn || '',
-              phone_number: null,
-              industry: null,
-              city: null,
-              country: null,
-              reputation_score: null,
-              invoice_count: 1,
-              unpaid_amount: 0,
-            };
-          } else {
-            byGstn[key].invoice_count += 1;
-          }
-        }
-        setResults(Object.values(byGstn));
-      } else {
-        setResults(response.data.results || []);
-      }
+      const response = await api.get('/company/search', { params });
+      setResults(response.data.results || []);
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Search failed. Please try again.');
     } finally {
@@ -84,9 +54,13 @@ const SearchPanel: React.FC = () => {
   };
 
   const handleRowClick = (result: SearchResult) => {
-    // Use window.location.href to ensure clean navigation out of the
-    // AppShell nested <Routes> context into the top-level route.
-    window.location.href = `/company/view/${result.company_id}`;
+    // Navigate by GSTN — company view is incident-based, not company_profiles-based
+    const gstn = result.gstn || '';
+    if (gstn) {
+      window.location.href = `/company/view/gstn/${encodeURIComponent(gstn)}`;
+    } else {
+      window.location.href = `/company/view/name/${encodeURIComponent(result.company_name)}`;
+    }
   };
 
   const getRepBadge = (score: number | null) => {
@@ -126,16 +100,6 @@ const SearchPanel: React.FC = () => {
           >
             By Phone
           </button>
-          <button
-            className={`px-4 py-2 font-medium transition-colors ${
-              searchType === 'name'
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-            onClick={() => { setSearchType('name'); setSearched(false); setResults([]); }}
-          >
-            By Company Name
-          </button>
         </div>
 
         {/* Search Form */}
@@ -144,8 +108,7 @@ const SearchPanel: React.FC = () => {
             type="text"
             placeholder={
               searchType === 'gstin' ? 'Enter 15-digit GSTIN (e.g. 24AABCX1234A1Z5)'
-              : searchType === 'phone' ? 'Enter phone number'
-              : 'Enter company name'
+              : 'Enter phone number'
             }
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
@@ -184,7 +147,7 @@ const SearchPanel: React.FC = () => {
         {!loading && results.length > 0 && (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Results ({results.length})</h3>
-            <p className="text-xs text-gray-400">Click a row to view the company profile</p>
+            <p className="text-xs text-gray-400">Click a row to view full company details, incidents &amp; contact persons</p>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">

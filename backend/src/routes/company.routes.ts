@@ -108,6 +108,79 @@ router.get('/view/:id', async (c) => {
   return c.json({ company: result.rows[0] });
 });
 
+
+/**
+ * GET /api/company/view-by-gstn
+ * View a reported company's invoices and contact persons.
+ * Data comes from the invoices and contact_persons tables (saved on incident submission).
+ * Query params: gstn (preferred) OR name
+ */
+router.get('/view-by-gstn', async (c) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+  const gstn = c.req.query('gstn');
+  const name = c.req.query('name');
+
+  if (!gstn && !name) {
+    return c.json({ error: 'Provide gstn or name query parameter.' }, 400);
+  }
+
+  // Look up invoices for this reported company
+  const invoiceResult = await db.query(
+    gstn
+      ? `SELECT
+           inv.id, inv.invoice_number, inv.amount, inv.amount_unpaid,
+           inv.issue_date, inv.due_date, inv.status, inv.description,
+           inv.category, inv.item_sold, inv.incident_id,
+           inv.reported_company_gstn, inv.reported_company_name
+         FROM invoices inv
+         WHERE inv.reported_company_gstn = $1
+         ORDER BY inv.issue_date DESC NULLS LAST, inv.created_at DESC`
+      : `SELECT
+           inv.id, inv.invoice_number, inv.amount, inv.amount_unpaid,
+           inv.issue_date, inv.due_date, inv.status, inv.description,
+           inv.category, inv.item_sold, inv.incident_id,
+           inv.reported_company_gstn, inv.reported_company_name
+         FROM invoices inv
+         WHERE LOWER(inv.reported_company_name) = LOWER($1)
+         ORDER BY inv.issue_date DESC NULLS LAST, inv.created_at DESC`,
+    [gstn ? gstn.toUpperCase() : name as string]
+  );
+
+  if (invoiceResult.rows.length === 0) {
+    return c.json({ error: 'No invoices found for this company.' }, 404);
+  }
+
+  const companyName: string = invoiceResult.rows[0].reported_company_name;
+  const companyGstn: string = invoiceResult.rows[0].reported_company_gstn || gstn || '';
+
+  // Look up contact persons for this company (by name or GSTN)
+  const contactResult = await db.query(
+    `SELECT DISTINCT ON (cp.name, cp.email)
+       cp.id, cp.name, cp.email, cp.phone, cp.company, cp.position, cp.company_gstn
+     FROM contact_persons cp
+     WHERE
+       (cp.company_gstn IS NOT NULL AND cp.company_gstn = $1)
+       OR LOWER(cp.company) = LOWER($2)
+     ORDER BY cp.name, cp.email, cp.created_at DESC`,
+    [companyGstn || '', companyName]
+  );
+
+  // Compute totals
+  const totalUnpaid = invoiceResult.rows
+    .filter((i: any) => i.status !== 'paid')
+    .reduce((sum: number, i: any) => sum + (parseFloat(i.amount_unpaid ?? i.amount) || 0), 0);
+
+  return c.json({
+    company_name: companyName,
+    gstn: companyGstn,
+    total_invoices: invoiceResult.rows.length,
+    total_unpaid: totalUnpaid,
+    invoices: invoiceResult.rows,
+    contact_persons: contactResult.rows,
+  });
+});
+
+
 /**
  * POST /api/company
  */

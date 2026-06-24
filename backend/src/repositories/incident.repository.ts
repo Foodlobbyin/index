@@ -23,8 +23,17 @@ export class IncidentRepository {
       reporter_name,
       reporter_email,
       reporter_phone,
-    } = data;
+      // Invoice fields (from Step 2 of the report form)
+      invoice_amount,
+      unpaid_amount,
+      invoice_date,
+      due_date,
+      item_sold,
+      // Contact persons (from Step 3)
+      contact_persons,
+    } = data as any;
 
+    // 1. Insert the incident record
     const result = await db.query(
       `INSERT INTO incidents (
         company_gstn, company_name, incident_type, incident_date, incident_title,
@@ -48,7 +57,61 @@ export class IncidentRepository {
         reporter_phone || null,
       ]
     );
-    return result.rows[0];
+    const incident = result.rows[0];
+
+    // 2. Save invoice details to invoices table (linked to the reported company)
+    if (invoice_amount || unpaid_amount || invoice_date || due_date) {
+      // Generate a unique invoice number: INC-<incidentId>-<timestamp>
+      const invoiceNumber = `INC-${incident.id}-${Date.now()}`;
+      await db.query(
+        `INSERT INTO invoices (
+          company_id, invoice_number, amount, issue_date, due_date, status,
+          description, category, amount_unpaid,
+          reported_company_gstn, reported_company_name, incident_id, item_sold, reporter_user_id
+        ) VALUES (
+          NULL, $1, $2, $3, $4, $5,
+          $6, $7, $8,
+          $9, $10, $11, $12, $13
+        )`,
+        [
+          invoiceNumber,
+          invoice_amount || amount_involved || null,
+          invoice_date || null,
+          due_date || null,
+          'pending',
+          description || null,
+          incident_type || null,
+          unpaid_amount ?? invoice_amount ?? amount_involved ?? null,
+          company_gstn || null,
+          company_name,
+          incident.id,
+          item_sold || null,
+          reporter_id || null,
+        ]
+      );
+    }
+
+    // 3. Save contact persons to contact_persons table
+    if (Array.isArray(contact_persons) && contact_persons.length > 0) {
+      for (const cp of contact_persons) {
+        if (!cp.name?.trim()) continue;
+        await db.query(
+          `INSERT INTO contact_persons (name, email, phone, company, position, incident_id, company_gstn)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            cp.name.trim(),
+            cp.email?.trim() || '',
+            cp.phone?.trim() || null,
+            company_name,
+            cp.position?.trim() || null,
+            incident.id,
+            company_gstn || null,
+          ]
+        );
+      }
+    }
+
+    return incident;
   }
 
   async findById(db: DbClient, id: number): Promise<Incident | null> {

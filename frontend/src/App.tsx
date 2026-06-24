@@ -61,7 +61,15 @@ export default function App(): JSX.Element {
             }
           />
           <Route
-            path="/company/view/:id"
+            path="/company/view/gstn/:gstn"
+            element={
+              <ProtectedRoute>
+                <CompanyView />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/company/view/name/:name"
             element={
               <ProtectedRoute>
                 <CompanyView />
