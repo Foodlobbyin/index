@@ -155,7 +155,7 @@ const ReportIncidentPage: React.FC = () => {
         item_sold: formData.item_sold || undefined,
         amount_involved: invoiceAmt,
         currency_code: formData.currency_code,
-        is_anonymous: formData.is_anonymous,
+        is_anonymous: true, // always anonymous — no checkbox needed
         contact_persons: formData.contact_persons.filter((c) => c.name.trim() !== ''),
       };
 
@@ -349,6 +349,16 @@ const ReportIncidentPage: React.FC = () => {
             <>
               <p className={sectionTitle}>Incident & Invoice Details</p>
 
+              {/* Privacy Disclaimer */}
+              <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
+                <svg className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <p>
+                  <span className="font-semibold">Your identity is always protected.</span> Your name, email, and company details will never be made public. Other users can only see the reported company's name, incident type, and financial figures — never who submitted this report.
+                </p>
+              </div>
+
               {/* Incident Type */}
               <div>
                 <label className={labelClass}>
@@ -369,47 +379,38 @@ const ReportIncidentPage: React.FC = () => {
 
               {/* Incident Date */}
               <div>
-                <label className={labelClass}>
-                  Incident Date <span className="text-red-500">*</span>
-                </label>
+                <label className={labelClass}>Incident Date</label>
                 <input
                   type="date"
                   name="incident_date"
                   className={inputClass}
                   value={formData.incident_date}
                   onChange={handleChange}
-                  required
                 />
               </div>
 
               {/* Title */}
               <div>
-                <label className={labelClass}>
-                  Incident Title <span className="text-red-500">*</span>
-                </label>
+                <label className={labelClass}>Incident Title</label>
                 <input
                   type="text"
                   name="incident_title"
                   className={inputClass}
                   value={formData.incident_title}
                   onChange={handleChange}
-                  placeholder="Brief summary of the issue"
-                  required
+                  placeholder="Brief summary of the issue (optional)"
                 />
               </div>
 
               {/* Description */}
               <div>
-                <label className={labelClass}>
-                  Description <span className="text-red-500">*</span>
-                </label>
+                <label className={labelClass}>Description</label>
                 <textarea
                   name="description"
                   className={`${inputClass} resize-y min-h-[100px]`}
                   value={formData.description}
                   onChange={handleChange}
-                  placeholder="Describe the incident in detail…"
-                  required
+                  placeholder="Describe the incident in detail… (optional)"
                 />
               </div>
 
@@ -499,20 +500,7 @@ const ReportIncidentPage: React.FC = () => {
                 />
               </div>
 
-              {/* Anonymous */}
-              <div className="flex items-center space-x-3">
-                <input
-                  type="checkbox"
-                  id="is_anonymous"
-                  name="is_anonymous"
-                  checked={formData.is_anonymous ?? false}
-                  onChange={handleChange}
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <label htmlFor="is_anonymous" className="text-sm text-gray-700">
-                  Submit anonymously (your name and email will not be shown)
-                </label>
-              </div>
+
             </>
           )}
 
@@ -653,3 +641,4 @@ const ReportIncidentPage: React.FC = () => {
 };
 
 export default ReportIncidentPage;
+
