@@ -12,29 +12,42 @@ export interface UserCreateData {
   gstn?: string;
   email_verification_token?: string;
   email_verification_expires?: Date;
+  // Invite system fields
+  invite_token_id?: number;
+  registration_status?: string;
 }
 
 export class UserRepository {
   async create(db: DbClient, user: UserCreateData): Promise<UserResponse> {
-    const { username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires } = user;
+    const {
+      username, mobile_number, phone_number, email, password_hash,
+      first_name, last_name, gstn, email_verification_token,
+      email_verification_expires, invite_token_id, registration_status,
+    } = user;
     const result = await db.query(
-      `INSERT INTO users (username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires, account_activated) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, FALSE) 
-       RETURNING id, username, mobile_number, phone_number, email, first_name, last_name, gstn, email_verified, account_activated, trust_level, created_at`,
-      [username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires]
+      `INSERT INTO users (
+         username, mobile_number, phone_number, email, password_hash,
+         first_name, last_name, gstn, email_verification_token,
+         email_verification_expires, account_activated,
+         invite_token_id, registration_status
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, FALSE, $11, $12)
+       RETURNING id, username, mobile_number, phone_number, email,
+                 first_name, last_name, gstn, email_verified, account_activated,
+                 trust_level, registration_status, can_send_invites, created_at`,
+      [
+        username, mobile_number, phone_number, email, password_hash,
+        first_name, last_name, gstn, email_verification_token,
+        email_verification_expires,
+        invite_token_id ?? null,
+        registration_status ?? 'active',
+      ]
     );
     return result.rows[0];
   }
 
   async createWithClient(db: DbClient, user: UserCreateData): Promise<UserResponse> {
-    const { username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires } = user;
-    const result = await db.query(
-      `INSERT INTO users (username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires, account_activated) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, FALSE) 
-       RETURNING id, username, mobile_number, phone_number, email, first_name, last_name, gstn, email_verified, account_activated, trust_level, created_at`,
-      [username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires]
-    );
-    return result.rows[0];
+    return this.create(db, user);
   }
 
   async findByUsername(db: DbClient, username: string): Promise<User | null> {
@@ -54,7 +67,10 @@ export class UserRepository {
 
   async findById(db: DbClient, id: number): Promise<UserResponse | null> {
     const result = await db.query(
-      'SELECT id, username, mobile_number, email, first_name, last_name, email_verified, trust_level, created_at FROM users WHERE id = $1',
+      `SELECT id, username, mobile_number, phone_number, email,
+              first_name, last_name, gstn, email_verified, account_activated,
+              trust_level, registration_status, can_send_invites, created_at
+       FROM users WHERE id = $1`,
       [id]
     );
     return result.rows[0] || null;
@@ -85,7 +101,7 @@ export class UserRepository {
 
   async setPasswordResetToken(db: DbClient, userId: number, token: string, expires: Date): Promise<void> {
     await db.query(
-      'UPDATE users SET password_reset_token = $1, password_reset_expires = $2 WHERE id = $1',
+      'UPDATE users SET password_reset_token = $1, password_reset_expires = $2 WHERE id = $3',
       [token, expires, userId]
     );
   }
