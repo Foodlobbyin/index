@@ -1,32 +1,31 @@
-import React, { useState, useEffect, FormEvent } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  incidentService,
-  Incident,
-  IncidentUpdateInput,
-  IncidentType,
-} from '../services/incidentService';
+import { incidentService, Incident } from '../services/incidentService';
 
-const INCIDENT_TYPES: { value: IncidentType; label: string }[] = [
-  { value: 'FRAUD', label: 'Fraud' },
-  { value: 'QUALITY_ISSUE', label: 'Quality Issue' },
-  { value: 'SERVICE_ISSUE', label: 'Service Issue' },
-  { value: 'PAYMENT_ISSUE', label: 'Payment Issue' },
-  { value: 'CONTRACT_BREACH', label: 'Contract Breach' },
-  { value: 'OTHER', label: 'Other' },
-];
-
-const MODERATOR_LEVELS = ['moderator', 'admin'] as const;
-
-const statusColors: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-700',
-  submitted: 'bg-blue-100 text-blue-700',
-  under_review: 'bg-yellow-100 text-yellow-700',
-  approved: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700',
-  resolved: 'bg-purple-100 text-purple-700',
+const statusConfig: Record<string, { label: string; bg: string; text: string; border: string }> = {
+  draft:        { label: 'Draft',        bg: 'bg-gray-100',    text: 'text-gray-700',   border: 'border-gray-200' },
+  submitted:    { label: 'Submitted',    bg: 'bg-blue-100',    text: 'text-blue-700',   border: 'border-blue-200' },
+  under_review: { label: 'Under Review', bg: 'bg-yellow-100',  text: 'text-yellow-800', border: 'border-yellow-200' },
+  approved:     { label: 'Approved',     bg: 'bg-green-100',   text: 'text-green-700',  border: 'border-green-200' },
+  rejected:     { label: 'Rejected',     bg: 'bg-red-100',     text: 'text-red-700',    border: 'border-red-200' },
+  resolved:     { label: 'Resolved',     bg: 'bg-purple-100',  text: 'text-purple-700', border: 'border-purple-200' },
 };
+
+const typeLabels: Record<string, string> = {
+  FRAUD: 'Fraud', QUALITY_ISSUE: 'Quality Issue', SERVICE_ISSUE: 'Service Issue',
+  PAYMENT_ISSUE: 'Payment Issue', CONTRACT_BREACH: 'Contract Breach', OTHER: 'Other',
+};
+
+function formatDate(s: string | null | undefined): string {
+  if (!s) return '—';
+  return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatAmount(amount: number | null | undefined, currency = 'INR'): string {
+  if (amount == null) return '—';
+  return `${currency} ${Number(amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+}
 
 const IncidentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -36,513 +35,230 @@ const IncidentDetailPage: React.FC = () => {
   const [incident, setIncident] = useState<Incident | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
-  // Edit state
-  const [editing, setEditing] = useState(false);
-  const [editData, setEditData] = useState<IncidentUpdateInput>({});
-  const [editLoading, setEditLoading] = useState(false);
-
-  // Moderation state
-  const [modNotes, setModNotes] = useState('');
-  const [rejectReason, setRejectReason] = useState('');
-  const [modLoading, setModLoading] = useState(false);
-
-  const isModerator =
-    !!user?.trust_level && MODERATOR_LEVELS.includes(user.trust_level as (typeof MODERATOR_LEVELS)[number]);
-  const isReporter = !!user && incident?.reporter_id === user.id && !incident?.is_anonymous;
+  // isReporter: check reporter_id match regardless of anonymity
+  // (The reporter themselves can see their own submission even if anonymous to others)
+  const isReporter = !!user && !!incident && incident.reporter_id === user.id;
 
   useEffect(() => {
     if (!id) return;
     const numId = parseInt(id, 10);
-    if (isNaN(numId)) {
-      setError('Invalid incident ID.');
-      setLoading(false);
-      return;
-    }
-    incidentService
-      .getById(numId)
-      .then((data) => {
-        setIncident(data);
-        setEditData({
-          company_gstn: data.company_gstn,
-          company_name: data.company_name,
-          incident_type: data.incident_type,
-          incident_date: data.incident_date ? data.incident_date.split('T')[0] : '',
-          incident_title: data.incident_title,
-          description: data.description,
-          amount_involved: data.amount_involved,
-          currency_code: data.currency_code,
-        });
-      })
+    if (isNaN(numId)) { setError('Invalid incident ID.'); setLoading(false); return; }
+    incidentService.getById(numId)
+      .then(setIncident)
       .catch((err: unknown) => {
-        const msg =
+        setError(
           (err as any)?.response?.data?.error ??
           (err as any)?.response?.data?.message ??
-          (err instanceof Error ? err.message : 'Failed to load incident.');
-        setError(msg);
+          'Failed to load incident.'
+        );
       })
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleEditChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    if (name === 'amount_involved') {
-      setEditData((prev) => ({ ...prev, amount_involved: value === '' ? undefined : parseFloat(value) }));
-    } else {
-      setEditData((prev) => ({ ...prev, [name]: value }));
-    }
-  };
-
-  const handleEditSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!incident) return;
-    setEditLoading(true);
-    setActionError(null);
-    setActionSuccess(null);
-    try {
-      const updated = await incidentService.update(incident.id, editData);
-      setIncident(updated);
-      setEditing(false);
-      setActionSuccess('Incident updated successfully.');
-    } catch (err: unknown) {
-      const msg =
-        (err as any)?.response?.data?.error ??
-        (err as any)?.response?.data?.message ??
-        (err instanceof Error ? err.message : 'Failed to update incident.');
-      setActionError(msg);
-    } finally {
-      setEditLoading(false);
-    }
-  };
-
   const handleDelete = async () => {
     if (!incident) return;
-    if (!window.confirm('Are you sure you want to delete this incident?')) return;
-    setActionError(null);
+    if (!window.confirm('Delete this incident? This cannot be undone.')) return;
     try {
       await incidentService.remove(incident.id);
-      navigate('/app/incidents');
+      navigate('/app/my-incidents');
     } catch (err: unknown) {
-      const msg =
-        (err as any)?.response?.data?.error ??
-        (err as any)?.response?.data?.message ??
-        (err instanceof Error ? err.message : 'Failed to delete incident.');
-      setActionError(msg);
-    }
-  };
-
-  const handleApprove = async () => {
-    if (!incident) return;
-    setModLoading(true);
-    setActionError(null);
-    setActionSuccess(null);
-    try {
-      await incidentService.approveIncident(incident.id, modNotes || undefined);
-      const updated = await incidentService.getById(incident.id);
-      setIncident(updated);
-      setActionSuccess('Incident approved.');
-      setModNotes('');
-    } catch (err: unknown) {
-      const msg =
-        (err as any)?.response?.data?.error ??
-        (err as any)?.response?.data?.message ??
-        (err instanceof Error ? err.message : 'Failed to approve incident.');
-      setActionError(msg);
-    } finally {
-      setModLoading(false);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!incident) return;
-    if (!rejectReason.trim()) {
-      setActionError('Rejection reason is required.');
-      return;
-    }
-    setModLoading(true);
-    setActionError(null);
-    setActionSuccess(null);
-    try {
-      await incidentService.rejectIncident(incident.id, rejectReason, modNotes || undefined);
-      const updated = await incidentService.getById(incident.id);
-      setIncident(updated);
-      setActionSuccess('Incident rejected.');
-      setModNotes('');
-      setRejectReason('');
-    } catch (err: unknown) {
-      const msg =
-        (err as any)?.response?.data?.error ??
-        (err as any)?.response?.data?.message ??
-        (err instanceof Error ? err.message : 'Failed to reject incident.');
-      setActionError(msg);
-    } finally {
-      setModLoading(false);
+      alert((err as any)?.response?.data?.error ?? 'Failed to delete.');
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <p className="text-gray-500 text-sm">Loading incident…</p>
+      <div className="flex items-center justify-center py-24">
+        <div className="text-center space-y-2">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-gray-400">Loading incident…</p>
+        </div>
       </div>
     );
   }
 
   if (error || !incident) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-sm text-red-700">
-        {error ?? 'Incident not found.'}
+      <div className="max-w-xl mx-auto mt-16 text-center space-y-4">
+        <p className="text-red-600 text-sm">{error ?? 'Incident not found.'}</p>
+        <button onClick={() => navigate(-1)} className="text-sm text-blue-600 hover:underline">← Go back</button>
       </div>
     );
   }
 
-  const inputClass =
-    'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
-  const labelClass = 'block text-sm font-medium text-gray-700 mb-1';
+  const status = statusConfig[incident.status] ?? statusConfig['draft'];
+  const incidentInvoices = (incident as any).incident_invoices ?? [];
+  const contactPersons = (incident as any).contact_persons ?? [];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      {/* Back link */}
-      <div>
-        <Link to="/app/incidents" className="text-sm text-blue-600 hover:text-blue-800 hover:underline">
-          ← Back to Incidents
+    <div className="max-w-3xl mx-auto pb-12 space-y-5">
+
+      {/* ── Top bar ── */}
+      <div className="flex items-center justify-between pt-1">
+        <Link to="/app/my-incidents" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 transition-colors">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to My Reports
         </Link>
+        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold tracking-wide ${status.bg} ${status.text}`}>
+          {status.label.toUpperCase()}
+        </span>
       </div>
 
-      {/* Feedback messages */}
-      {actionError && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
-          {actionError}
+      {/* ── Company + Incident Header ── */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-5">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">Incident Report</p>
+          <h1 className="text-xl font-bold text-white leading-snug">{incident.company_name}</h1>
+          {incident.company_gstn && (
+            <p className="text-xs text-slate-300 font-mono mt-1">GSTIN: {incident.company_gstn}</p>
+          )}
+        </div>
+
+        <div className="px-6 py-5 grid grid-cols-2 sm:grid-cols-3 gap-5">
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Incident Type</p>
+            <p className="text-sm font-semibold text-gray-900">{typeLabels[incident.incident_type] ?? incident.incident_type.replace(/_/g, ' ')}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Date Reported</p>
+            <p className="text-sm font-semibold text-gray-900">{formatDate(incident.incident_date ?? incident.created_at)}</p>
+          </div>
+          {incident.amount_involved != null && (
+            <div>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Total Amount Involved</p>
+              <p className="text-sm font-bold text-red-600">{formatAmount(incident.amount_involved, incident.currency_code ?? 'INR')}</p>
+            </div>
+          )}
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Submission Date</p>
+            <p className="text-sm text-gray-700">{new Date(incident.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Reporter</p>
+            <p className="text-sm text-gray-500 italic">Anonymous</p>
+          </div>
+          {incident.company_gstn && (
+            <div>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">State (from GSTIN)</p>
+              <p className="text-sm text-gray-700">{incident.state ?? '—'}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Description ── */}
+      {incident.description && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-6 py-5">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Description</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{incident.description}</p>
         </div>
       )}
-      {actionSuccess && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-700">
-          {actionSuccess}
-        </div>
-      )}
 
-      {/* Main card */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">{incident.incident_title}</h2>
-            <p className="text-sm text-gray-500 mt-1">{incident.company_name}</p>
-          </div>
-          <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-              statusColors[incident.status] ?? 'bg-gray-100 text-gray-700'
-            }`}
-          >
-            {incident.status.replace(/_/g, ' ').toUpperCase()}
-          </span>
-        </div>
-
-        {/* Detail grid */}
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm mt-4">
-          <div>
-            <dt className="font-medium text-gray-500">GSTIN</dt>
-            <dd className="text-gray-900 mt-1">{incident.company_gstn ?? '—'}</dd>
-          </div>
-          <div>
-            <dt className="font-medium text-gray-500">Incident Type</dt>
-            <dd className="text-gray-900 mt-1">{incident.incident_type.replace(/_/g, ' ')}</dd>
-          </div>
-          <div>
-            <dt className="font-medium text-gray-500">Incident Date</dt>
-            <dd className="text-gray-900 mt-1">{incident.incident_date ? new Date(incident.incident_date).toLocaleDateString() : "—"}</dd>
-          </div>
-          <div>
-            <dt className="font-medium text-gray-500">Amount Involved</dt>
-            <dd className="text-gray-900 mt-1">
-              {incident.amount_involved != null
-                ? `${incident.currency_code} ${incident.amount_involved.toLocaleString()}`
-                : '—'}
-            </dd>
-          </div>
-          {!incident.is_anonymous && incident.reporter_name && (
+      {/* ── Invoices ── */}
+      {incidentInvoices.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <div>
-              <dt className="font-medium text-gray-500">Reporter</dt>
-              <dd className="text-gray-900 mt-1">{incident.reporter_name}</dd>
+              <p className="text-sm font-semibold text-gray-900">Invoices in this Incident</p>
+              <p className="text-xs text-gray-400 mt-0.5">{incidentInvoices.length} invoice{incidentInvoices.length !== 1 ? 's' : ''} reported</p>
             </div>
-          )}
-          {!incident.is_anonymous && incident.reporter_email && (
-            <div>
-              <dt className="font-medium text-gray-500">Reporter Email</dt>
-              <dd className="text-gray-900 mt-1">{incident.reporter_email}</dd>
-            </div>
-          )}
-          {incident.is_anonymous && (
-            <div>
-              <dt className="font-medium text-gray-500">Reporter</dt>
-              <dd className="text-gray-500 mt-1 italic">Anonymous</dd>
-            </div>
-          )}
-          <div>
-            <dt className="font-medium text-gray-500">Submitted</dt>
-            <dd className="text-gray-900 mt-1">{new Date(incident.created_at).toLocaleString()}</dd>
+            <span className="text-xs font-semibold bg-red-100 text-red-700 px-3 py-1 rounded-full">
+              {incidentInvoices.length} unpaid
+            </span>
           </div>
-        </dl>
-
-        {/* Description */}
-        <div className="mt-6">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">Description</h3>
-          <p className="text-sm text-gray-900 whitespace-pre-line">{incident.description}</p>
-        </div>
-
-        {/* Incident Invoices */}
-        {Array.isArray((incident as any).incident_invoices) && (incident as any).incident_invoices.length > 0 && (
-          <div className="mt-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-3">Invoices in this Incident</h3>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
-                <thead className="bg-gray-50">
-                  <tr>
-                    {['Invoice Amount', 'Unpaid Amount', 'Invoice Date', 'Due Date', 'Item/Product'].map((col) => (
-                      <th key={col} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{col}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {(incident as any).incident_invoices.map((inv: any) => (
-                    <tr key={inv.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 font-medium text-gray-900">₹{Number(inv.invoice_amount).toLocaleString('en-IN')}</td>
-                      <td className="px-3 py-2 text-red-700 font-medium">₹{Number(inv.unpaid_amount).toLocaleString('en-IN')}</td>
-                      <td className="px-3 py-2 text-gray-600">{inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString('en-IN') : '—'}</td>
-                      <td className="px-3 py-2 text-gray-600">{inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-IN') : '—'}</td>
-                      <td className="px-3 py-2 text-gray-700">{inv.item_sold || '—'}</td>
-                    </tr>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left">
+                  {['#', 'Invoice Date', 'Due Date', 'Invoice Amount', 'Unpaid Amount', 'Item / Product'].map(col => (
+                    <th key={col} className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{col}</th>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Contact Persons */}
-        {Array.isArray((incident as any).contact_persons) && (incident as any).contact_persons.length > 0 && (
-          <div className="mt-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-3">Contact Persons at Reported Company</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {(incident as any).contact_persons.map((cp: any) => (
-                <div key={cp.id} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                  <p className="font-medium text-gray-900 text-sm">{cp.name}</p>
-                  {cp.position && <p className="text-xs text-gray-500 mt-0.5">{cp.position}</p>}
-                  {cp.phone && <p className="text-xs text-gray-600 mt-1">📞 {cp.phone}</p>}
-                  {cp.email && <p className="text-xs text-gray-600">{cp.email}</p>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Moderator notes / rejection reason */}
-        {incident.moderator_notes && (
-          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-xs font-medium text-blue-600 uppercase mb-1">Moderator Notes</p>
-            <p className="text-sm text-blue-900">{incident.moderator_notes}</p>
-          </div>
-        )}
-        {incident.rejection_reason && (
-          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-xs font-medium text-red-600 uppercase mb-1">Rejection Reason</p>
-            <p className="text-sm text-red-900">{incident.rejection_reason}</p>
-          </div>
-        )}
-
-        {/* Reporter actions */}
-        {isReporter && !editing && (
-          <div className="mt-6 flex items-center space-x-3 border-t border-gray-100 pt-4">
-            <button
-              onClick={() => setEditing(true)}
-              className="px-4 py-2 text-sm font-medium text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
-            >
-              Edit
-            </button>
-            <button
-              onClick={handleDelete}
-              className="px-4 py-2 text-sm font-medium text-red-700 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
-            >
-              Delete
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Edit form */}
-      {editing && isReporter && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-base font-semibold text-gray-900 mb-4">Edit Incident</h3>
-          <form onSubmit={handleEditSubmit} className="space-y-4">
-            <div>
-              <label className={labelClass}>Company GSTIN</label>
-              <input
-                type="text"
-                name="company_gstn"
-                className={inputClass}
-                value={editData.company_gstn ?? ''}
-                onChange={handleEditChange}
-                disabled={editLoading}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Company Name <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                name="company_name"
-                className={inputClass}
-                value={editData.company_name ?? ''}
-                onChange={handleEditChange}
-                required
-                disabled={editLoading}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Incident Type <span className="text-red-500">*</span></label>
-              <select
-                name="incident_type"
-                className={inputClass}
-                value={editData.incident_type ?? 'FRAUD'}
-                onChange={handleEditChange}
-                required
-                disabled={editLoading}
-              >
-                {INCIDENT_TYPES.map(({ value, label }) => (
-                  <option key={value} value={value}>{label}</option>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {incidentInvoices.map((inv: any, idx: number) => (
+                  <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{formatDate(inv.invoice_date)}</td>
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{formatDate(inv.due_date)}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{formatAmount(inv.invoice_amount, inv.currency_code)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="font-bold text-red-600">{formatAmount(inv.unpaid_amount, inv.currency_code)}</span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{inv.item_sold || <span className="text-gray-300">—</span>}</td>
+                  </tr>
                 ))}
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Incident Date <span className="text-red-500">*</span></label>
-              <input
-                type="date"
-                name="incident_date"
-                className={inputClass}
-                value={editData.incident_date ?? ''}
-                onChange={handleEditChange}
-                required
-                disabled={editLoading}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Title <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                name="incident_title"
-                className={inputClass}
-                value={editData.incident_title ?? ''}
-                onChange={handleEditChange}
-                required
-                disabled={editLoading}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Description <span className="text-red-500">*</span></label>
-              <textarea
-                name="description"
-                className={`${inputClass} resize-y min-h-[100px]`}
-                value={editData.description ?? ''}
-                onChange={handleEditChange}
-                required
-                disabled={editLoading}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={labelClass}>Amount Involved</label>
-                <input
-                  type="number"
-                  name="amount_involved"
-                  className={inputClass}
-                  value={editData.amount_involved ?? ''}
-                  onChange={handleEditChange}
-                  min="0"
-                  step="0.01"
-                  disabled={editLoading}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Currency</label>
-                <input
-                  type="text"
-                  name="currency_code"
-                  className={inputClass}
-                  value={editData.currency_code ?? 'INR'}
-                  onChange={handleEditChange}
-                  maxLength={3}
-                  disabled={editLoading}
-                />
-              </div>
-            </div>
-            <div className="flex items-center space-x-3 pt-2">
-              <button
-                type="submit"
-                disabled={editLoading}
-                className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {editLoading ? 'Saving…' : 'Save Changes'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditing(false)}
-                disabled={editLoading}
-                className="px-5 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Moderation controls — only show if moderator AND not the reporter of this incident */}
-      {isModerator && !isReporter && (
-        <div className="bg-white rounded-lg shadow-sm border border-yellow-200 p-6">
-          <h3 className="text-base font-semibold text-gray-900 mb-4">Moderation Controls</h3>
-          <div className="space-y-4">
-            <div>
-              <label className={labelClass}>Notes (optional)</label>
-              <textarea
-                className={`${inputClass} resize-y`}
-                value={modNotes}
-                onChange={(e) => setModNotes(e.target.value)}
-                placeholder="Add notes visible to all parties…"
-                disabled={modLoading}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Rejection Reason (required to reject)</label>
-              <input
-                type="text"
-                className={inputClass}
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Reason for rejection…"
-                disabled={modLoading}
-              />
-            </div>
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={handleApprove}
-                disabled={modLoading}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {modLoading ? 'Processing…' : 'Approve'}
-              </button>
-              <button
-                onClick={handleReject}
-                disabled={modLoading}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {modLoading ? 'Processing…' : 'Reject'}
-              </button>
-            </div>
+              </tbody>
+            </table>
           </div>
         </div>
       )}
+
+      {/* ── Contact Persons ── */}
+      {contactPersons.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-6 py-5">
+          <p className="text-sm font-semibold text-gray-900 mb-1">Contact Persons at Reported Company</p>
+          <p className="text-xs text-gray-400 mb-4">Individuals identified at this company in connection with this incident.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {contactPersons.map((cp: any) => (
+              <div key={cp.id} className="flex items-start gap-3 border border-gray-100 rounded-xl p-3.5 bg-gray-50">
+                <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-slate-600">{cp.name?.charAt(0)?.toUpperCase() ?? '?'}</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{cp.name}</p>
+                  {cp.position && <p className="text-xs text-gray-500">{cp.position}</p>}
+                  {cp.phone && <p className="text-xs text-gray-600 mt-1">📞 {cp.phone}</p>}
+                  {cp.email && <p className="text-xs text-gray-500 truncate">{cp.email}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Moderator/Rejection Notes (read-only display only) ── */}
+      {incident.moderator_notes && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl px-6 py-4">
+          <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-1">Moderator Notes</p>
+          <p className="text-sm text-blue-800">{incident.moderator_notes}</p>
+        </div>
+      )}
+      {incident.rejection_reason && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl px-6 py-4">
+          <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-1">Rejection Reason</p>
+          <p className="text-sm text-red-800">{incident.rejection_reason}</p>
+        </div>
+      )}
+
+      {/* ── Reporter Actions (Draft only) ── */}
+      {isReporter && incident.status === 'draft' && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-6 py-4 flex items-center gap-3">
+          <p className="text-sm text-gray-500 flex-1">This incident is still a draft.</p>
+          <button
+            onClick={handleDelete}
+            className="px-4 py-2 text-sm font-medium text-red-700 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      )}
+
+      {/* ── Status info for non-draft ── */}
+      {incident.status === 'submitted' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl px-6 py-4">
+          <p className="text-sm text-blue-700 font-medium">This report has been submitted and is awaiting moderation review.</p>
+        </div>
+      )}
+      {incident.status === 'approved' && (
+        <div className="bg-green-50 border border-green-200 rounded-2xl px-6 py-4">
+          <p className="text-sm text-green-700 font-medium">This report has been verified and is publicly visible on the platform.</p>
+        </div>
+      )}
+
     </div>
   );
 };
