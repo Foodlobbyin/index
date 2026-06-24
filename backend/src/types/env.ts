@@ -14,6 +14,10 @@ export type Env = {
   NODE_ENV: string;
   EMAIL_FROM: string;
   RESEND_API_KEY: string;
+  GSTN_API_KEY?: string;
+  // One-time admin setup secret — set via: wrangler secret put ADMIN_SETUP_KEY
+  // Delete or leave unset after first use to permanently disable the setup route.
+  ADMIN_SETUP_KEY?: string;
   RATE_LIMIT_KV: KVNamespace;
   EVIDENCE_BUCKET: R2Bucket;
 };
