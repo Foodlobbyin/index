@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link, Navigate, NavLink, Routes, Route, useLocation } from 'react-router-dom';
-import { Search, MessageSquare, LogOut, User, ClipboardList, Shield, FileText, Settings, KeyRound, BookOpen } from 'lucide-react';
+import { Search, MessageSquare, LogOut, User, ClipboardList, Shield, FileText, Settings, KeyRound, BookOpen, MapPin, Newspaper } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Tabs from '../components/ui/Tabs';
 import SearchSubmitSection from '../components/app/SearchSubmitSection';
+import StatesSection from '../components/app/StatesSection';
 import ForumSection from '../components/app/ForumSection';
+import InsiderSection from '../components/app/InsiderSection';
 import AuditLogPage from './AuditLogPage';
 import ReportIncidentPage from './ReportIncidentPage';
 import IncidentDetailPage from './IncidentDetailPage';
@@ -23,10 +25,12 @@ const AppShell: React.FC = () => {
   const isAdmin = user?.trust_level === 'admin';
 
   const tabs = [
-    { id: 'search', label: 'Search & Submit', icon: <Search size={18} /> },
+    { id: 'search', label: 'Search', icon: <Search size={18} /> },
+    { id: 'states', label: 'States', icon: <MapPin size={18} /> },
     { id: 'forum', label: 'Industry Forum', icon: <MessageSquare size={18} /> },
+    { id: 'insider', label: 'Insider', icon: <Newspaper size={18} /> },
     ...(canAccessAuditLogs
-      ? [{ id: 'auditlogs', label: 'Audit Logs', icon: <ClipboardList size={18} /> }]
+      ? [{ id: 'activitylog', label: 'Activity Log', icon: <ClipboardList size={18} /> }]
       : []),
   ];
 
@@ -176,8 +180,10 @@ const AppShell: React.FC = () => {
                 {(activeTab) => (
                   <>
                     {activeTab === 'search' && <SearchSubmitSection />}
+                    {activeTab === 'states' && <StatesSection />}
                     {activeTab === 'forum' && <ForumSection />}
-                    {activeTab === 'auditlogs' && (
+                    {activeTab === 'insider' && <InsiderSection />}
+                    {activeTab === 'activitylog' && (
                       canAccessAuditLogs ? <AuditLogPage /> : <Navigate to="/app" replace />
                     )}
                   </>

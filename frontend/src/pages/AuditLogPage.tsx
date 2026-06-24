@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { auditLogService, AuditLogSearchParams, AuditLog, AuditLogSearchResult } from '../services/auditLogService';
 
 const AuditLogPage: React.FC = () => {
@@ -61,11 +61,45 @@ const AuditLogPage: React.FC = () => {
   const currentPage = result?.page ?? params.page ?? 1;
   const totalPages = result?.total_pages ?? 0;
 
+  // Auto-load latest 20 logs on mount so the page isn't blank
+  useEffect(() => {
+    handleSearch({ page: 1 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const ACTION_LABELS: Record<string, string> = {
+    APPROVE: 'Approved',
+    REJECT: 'Rejected',
+    ESCALATE: 'Escalated',
+    incident_reported: 'Incident Filed',
+    incident_submitted_for_review: 'Sent for Review',
+    incident_updated: 'Updated',
+    incident_deleted: 'Deleted',
+  };
+
+  const ACTION_COLORS: Record<string, string> = {
+    APPROVE: 'bg-green-100 text-green-800',
+    REJECT: 'bg-red-100 text-red-800',
+    ESCALATE: 'bg-yellow-100 text-yellow-800',
+    incident_reported: 'bg-blue-100 text-blue-800',
+    incident_submitted_for_review: 'bg-purple-100 text-purple-800',
+    incident_updated: 'bg-gray-100 text-gray-700',
+    incident_deleted: 'bg-red-100 text-red-800',
+  };
+
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-1">Activity Log</h2>
+        <p className="text-gray-500 text-sm">
+          Full audit trail of all moderation actions and incident lifecycle events.
+        </p>
+      </div>
+
       {/* Filter Form */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Search Audit Logs</h2>
+        <h3 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Filter Logs</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Incident ID</label>
@@ -213,8 +247,10 @@ const AuditLogPage: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{log.incident_id}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{log.moderator_id}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {log.action}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          ACTION_COLORS[log.action] ?? 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {ACTION_LABELS[log.action] ?? log.action}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">

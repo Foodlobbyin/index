@@ -79,49 +79,76 @@ router.get('/', invoiceController.getMarketInsights);
 router.get('/dashboard', async (c) => {
   const db = createDbClient(c.env.DATABASE_URL);
   try {
-    const [companies, invoices, incidents, monthlyInvoices, statusBreakdown] = await Promise.all([
-      db.query(`SELECT COUNT(*)::int AS total FROM company_profiles cp JOIN users u ON u.id = cp.user_id WHERE u.registration_status = 'active'`),
+    const [incidentStats, monthlyIncidents, incidentByType] = await Promise.all([
+      // Total unique companies reported, total incidents, resolved count
       db.query(`
         SELECT
-          COUNT(*)::int                                                              AS total_invoices,
-          COUNT(*) FILTER (WHERE status != 'paid')::int                             AS unpaid_invoices
-        FROM invoices
+          COUNT(*)::int                                                          AS total_incidents,
+          COUNT(DISTINCT company_gstn)::int                                     AS total_companies,
+          COUNT(*) FILTER (WHERE status = 'resolved')::int                      AS resolved_issues,
+          COUNT(*) FILTER (WHERE status IN ('approved','under_review','pending_review'))::int AS active_incidents
+        FROM incidents
       `),
-      db.query(`SELECT COUNT(*) FILTER (WHERE status = 'resolved')::int AS resolved_issues FROM incidents`),
+      // Incidents reported per month (last 6 months)
       db.query(`
         SELECT
           TO_CHAR(created_at, 'Mon') AS month,
           EXTRACT(MONTH FROM created_at)::int AS month_num,
           EXTRACT(YEAR FROM created_at)::int AS year,
-          COUNT(*) FILTER (WHERE status = 'paid')::int   AS paid,
-          COUNT(*) FILTER (WHERE status != 'paid')::int  AS unpaid
-        FROM invoices
+          COUNT(*) FILTER (WHERE status = 'resolved')::int  AS paid,
+          COUNT(*) FILTER (WHERE status != 'resolved')::int AS unpaid
+        FROM incidents
         WHERE created_at >= NOW() - INTERVAL '6 months'
         GROUP BY month, month_num, year
         ORDER BY year, month_num
       `),
+      // Breakdown by incident type
       db.query(`
         SELECT
-          INITCAP(status) AS status,
-          COUNT(*)::int   AS count,
-          COALESCE(SUM(amount), 0)::float AS value
-        FROM invoices
-        GROUP BY status
+          REPLACE(incident_type, '_', ' ') AS status,
+          COUNT(*)::int                    AS count,
+          COALESCE(SUM(amount_involved), 0)::float AS value
+        FROM incidents
+        GROUP BY incident_type
         ORDER BY count DESC
       `),
     ]);
 
     return c.json({
-      totalCompanies:  companies.rows[0]?.total ?? 0,
-      totalInvoices:   invoices.rows[0]?.total_invoices ?? 0,
-      unpaidInvoices:  invoices.rows[0]?.unpaid_invoices ?? 0,
-      resolvedIssues:  incidents.rows[0]?.resolved_issues ?? 0,
-      invoicesByMonth: monthlyInvoices.rows,
-      invoicesByStatus: statusBreakdown.rows,
+      totalCompanies:   incidentStats.rows[0]?.total_companies ?? 0,
+      totalInvoices:    incidentStats.rows[0]?.total_incidents ?? 0,
+      unpaidInvoices:   incidentStats.rows[0]?.active_incidents ?? 0,
+      resolvedIssues:   incidentStats.rows[0]?.resolved_issues ?? 0,
+      invoicesByMonth:  monthlyIncidents.rows,
+      invoicesByStatus: incidentByType.rows,
     });
   } catch (err: any) {
     console.error('Dashboard stats error:', err);
     return c.json({ error: 'Failed to load dashboard stats.' }, 500);
+  }
+});
+
+/**
+ * GET /api/insights/states
+ * Returns incident and company counts grouped by Indian state (derived from GSTIN prefix).
+ */
+router.get('/states', async (c) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+  try {
+    const result = await db.query(`
+      SELECT
+        SUBSTRING(company_gstn, 1, 2)            AS state_code,
+        COUNT(*)::int                            AS incident_count,
+        COUNT(DISTINCT company_gstn)::int        AS company_count
+      FROM incidents
+      WHERE LENGTH(company_gstn) = 15
+      GROUP BY state_code
+      ORDER BY incident_count DESC
+    `);
+    return c.json({ states: result.rows });
+  } catch (err: any) {
+    console.error('States stats error:', err);
+    return c.json({ error: 'Failed to load state data.' }, 500);
   }
 });
 

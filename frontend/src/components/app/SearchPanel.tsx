@@ -23,7 +23,7 @@ interface SearchResult {
 
 const SearchPanel: React.FC = () => {
   const navigate = useNavigate();
-  const [searchType, setSearchType] = useState<'gstin' | 'phone'>('gstin');
+  const [searchType, setSearchType] = useState<'gstin' | 'phone' | 'name'>('gstin');
   const [searchValue, setSearchValue] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,10 +42,40 @@ const SearchPanel: React.FC = () => {
     try {
       const params = searchType === 'gstin'
         ? { gstn: searchValue.trim().toUpperCase() }
-        : { phone: searchValue.trim() };
+        : searchType === 'phone'
+        ? { phone: searchValue.trim() }
+        : { name: searchValue.trim() };
 
-      const response = await api.get('/company/search', { params });
-      setResults(response.data.results || []);
+      const endpoint = searchType === 'name' ? '/incident/search' : '/company/search';
+      const response = await api.get(endpoint, { params });
+      // incident/search returns { incidents } array, normalize to same shape
+      if (searchType === 'name') {
+        const incidents = response.data.incidents || [];
+        // Deduplicate by GSTN and aggregate
+        const byGstn: Record<string, SearchResult> = {};
+        for (const inc of incidents) {
+          const key = inc.company_gstn || inc.company_name;
+          if (!byGstn[key]) {
+            byGstn[key] = {
+              company_id: inc.id,
+              company_name: inc.company_name,
+              gstn: inc.company_gstn || '',
+              phone_number: null,
+              industry: null,
+              city: null,
+              country: null,
+              reputation_score: null,
+              invoice_count: 1,
+              unpaid_amount: 0,
+            };
+          } else {
+            byGstn[key].invoice_count += 1;
+          }
+        }
+        setResults(Object.values(byGstn));
+      } else {
+        setResults(response.data.results || []);
+      }
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Search failed. Please try again.');
     } finally {
@@ -84,7 +114,7 @@ const SearchPanel: React.FC = () => {
             }`}
             onClick={() => { setSearchType('gstin'); setSearched(false); setResults([]); }}
           >
-            Search by GSTIN
+            By GSTIN
           </button>
           <button
             className={`px-4 py-2 font-medium transition-colors ${
@@ -94,7 +124,17 @@ const SearchPanel: React.FC = () => {
             }`}
             onClick={() => { setSearchType('phone'); setSearched(false); setResults([]); }}
           >
-            Search by Phone
+            By Phone
+          </button>
+          <button
+            className={`px-4 py-2 font-medium transition-colors ${
+              searchType === 'name'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            onClick={() => { setSearchType('name'); setSearched(false); setResults([]); }}
+          >
+            By Company Name
           </button>
         </div>
 
@@ -102,11 +142,15 @@ const SearchPanel: React.FC = () => {
         <form onSubmit={handleSearch} className="flex gap-3">
           <Input
             type="text"
-            placeholder={searchType === 'gstin' ? 'Enter 15-digit GSTIN (e.g. 24AABCX1234A1Z5)' : 'Enter phone number'}
+            placeholder={
+              searchType === 'gstin' ? 'Enter 15-digit GSTIN (e.g. 24AABCX1234A1Z5)'
+              : searchType === 'phone' ? 'Enter phone number'
+              : 'Enter company name'
+            }
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             fullWidth
-            maxLength={searchType === 'gstin' ? 15 : 13}
+            maxLength={searchType === 'gstin' ? 15 : undefined}
           />
           <Button type="submit" isLoading={loading} className="whitespace-nowrap">
             <Search size={18} className="mr-2" />
@@ -155,10 +199,10 @@ const SearchPanel: React.FC = () => {
                       Phone
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Invoices
+                      Incidents
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Unpaid
+                      Amount at Risk
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Reputation

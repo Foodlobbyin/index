@@ -26,51 +26,46 @@ router.get('/search', async (c) => {
   let rows;
 
   if (gstn) {
-    // Exact GSTN match on users table, join company_profiles
+    // Search incidents by GSTN — returns distinct companies that have been reported
     const result = await db.query(
       `SELECT
-         cp.id            AS company_id,
-         cp.company_name,
-         cp.industry,
-         cp.city,
-         cp.country,
-         cp.reputation_score,
-         u.gstn,
-         u.phone_number,
-         COUNT(DISTINCT inv.id)::int                                  AS invoice_count,
-         COALESCE(SUM(CASE WHEN inv.status != 'paid' THEN inv.amount ELSE 0 END), 0) AS unpaid_amount
-       FROM users u
-       JOIN company_profiles cp ON cp.user_id = u.id
-       LEFT JOIN invoices inv ON inv.company_id = cp.id
-       WHERE u.gstn = $1
-         AND u.registration_status = 'active'
-       GROUP BY cp.id, cp.company_name, cp.industry, cp.city, cp.country, cp.reputation_score, u.gstn, u.phone_number
-       ORDER BY cp.company_name`,
+         MIN(i.id)::int                                     AS company_id,
+         MAX(i.company_name)                               AS company_name,
+         NULL::text                                        AS industry,
+         NULL::text                                        AS city,
+         NULL::text                                        AS country,
+         NULL::int                                         AS reputation_score,
+         i.company_gstn                                    AS gstn,
+         NULL::text                                        AS phone_number,
+         COUNT(*)::int                                     AS invoice_count,
+         COALESCE(SUM(CASE WHEN i.status NOT IN ('resolved') THEN i.amount_involved ELSE 0 END), 0) AS unpaid_amount
+       FROM incidents i
+       WHERE i.company_gstn = $1
+       GROUP BY i.company_gstn
+       ORDER BY company_name`,
       [gstn.toUpperCase()]
     );
     rows = result.rows;
   } else {
-    // Partial phone match — strip non-digits for flexible matching
+    // Search contact_persons by phone, then find matching incidents by company name
     const clean = (phone as string).replace(/\D/g, '');
     const result = await db.query(
       `SELECT
-         cp.id            AS company_id,
-         cp.company_name,
-         cp.industry,
-         cp.city,
-         cp.country,
-         cp.reputation_score,
-         u.gstn,
-         u.phone_number,
-         COUNT(DISTINCT inv.id)::int                                  AS invoice_count,
-         COALESCE(SUM(CASE WHEN inv.status != 'paid' THEN inv.amount ELSE 0 END), 0) AS unpaid_amount
-       FROM users u
-       JOIN company_profiles cp ON cp.user_id = u.id
-       LEFT JOIN invoices inv ON inv.company_id = cp.id
-       WHERE REGEXP_REPLACE(COALESCE(u.phone_number, ''), '[^0-9]', '', 'g') LIKE $1
-         AND u.registration_status = 'active'
-       GROUP BY cp.id, cp.company_name, cp.industry, cp.city, cp.country, cp.reputation_score, u.gstn, u.phone_number
-       ORDER BY cp.company_name
+         MIN(i.id)::int                                     AS company_id,
+         MAX(i.company_name)                               AS company_name,
+         NULL::text                                        AS industry,
+         NULL::text                                        AS city,
+         NULL::text                                        AS country,
+         NULL::int                                         AS reputation_score,
+         i.company_gstn                                    AS gstn,
+         cp_sub.phone                                      AS phone_number,
+         COUNT(DISTINCT i.id)::int                         AS invoice_count,
+         COALESCE(SUM(CASE WHEN i.status NOT IN ('resolved') THEN i.amount_involved ELSE 0 END), 0) AS unpaid_amount
+       FROM incidents i
+       JOIN contact_persons cp_sub ON LOWER(cp_sub.company) = LOWER(i.company_name)
+       WHERE REGEXP_REPLACE(COALESCE(cp_sub.phone, ''), '[^0-9]', '', 'g') LIKE $1
+       GROUP BY i.company_gstn, cp_sub.phone
+       ORDER BY company_name
        LIMIT 20`,
       [`%${clean}%`]
     );

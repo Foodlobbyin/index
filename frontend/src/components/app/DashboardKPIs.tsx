@@ -66,7 +66,7 @@ const DashboardKPIs: React.FC = () => {
         <Card>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Total Companies</p>
+              <p className="text-sm text-gray-600 mb-1">Companies Reported</p>
               <p className="text-3xl font-bold text-gray-900">{stats?.totalCompanies || 0}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-lg">
@@ -78,7 +78,7 @@ const DashboardKPIs: React.FC = () => {
         <Card>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Total Invoices</p>
+              <p className="text-sm text-gray-600 mb-1">Total Incidents</p>
               <p className="text-3xl font-bold text-gray-900">{stats?.totalInvoices || 0}</p>
             </div>
             <div className="p-3 bg-green-100 rounded-lg">
@@ -90,7 +90,7 @@ const DashboardKPIs: React.FC = () => {
         <Card>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Unpaid Invoices</p>
+              <p className="text-sm text-gray-600 mb-1">Active Cases</p>
               <p className="text-3xl font-bold text-red-600">{stats?.unpaidInvoices || 0}</p>
             </div>
             <div className="p-3 bg-red-100 rounded-lg">
@@ -116,7 +116,7 @@ const DashboardKPIs: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Bar Chart - Invoices by Month */}
         <Card>
-          <h3 className="text-lg font-semibold mb-4">Invoices by Month</h3>
+          <h3 className="text-lg font-semibold mb-4">Incidents by Month</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={invoicesByMonth}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -124,15 +124,15 @@ const DashboardKPIs: React.FC = () => {
               <YAxis />
               <Tooltip />
               <Legend />
-              <Bar dataKey="paid" fill="#10b981" name="Paid" />
-              <Bar dataKey="unpaid" fill="#ef4444" name="Unpaid" />
+              <Bar dataKey="paid" fill="#10b981" name="Resolved" />
+              <Bar dataKey="unpaid" fill="#ef4444" name="Active" />
             </BarChart>
           </ResponsiveContainer>
         </Card>
 
         {/* Pie Chart - Invoices by Status */}
         <Card>
-          <h3 className="text-lg font-semibold mb-4">Invoices by Status</h3>
+          <h3 className="text-lg font-semibold mb-4">Incidents by Type</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
