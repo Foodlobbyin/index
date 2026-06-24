@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Link, Navigate, NavLink, Routes, Route, useLocation } from 'react-router-dom';
-import { Search, MessageSquare, LogOut, User, ClipboardList, Shield, FileText, Settings, KeyRound, BookOpen, MapPin, Newspaper } from 'lucide-react';
+import { Search, MessageSquare, LogOut, User, ClipboardList, Shield, FileText, Settings, KeyRound, BookOpen, BarChart2, Newspaper } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Tabs from '../components/ui/Tabs';
 import SearchSubmitSection from '../components/app/SearchSubmitSection';
-import StatesSection from '../components/app/StatesSection';
+import DashboardKPIs from '../components/app/DashboardKPIs';
 import ForumSection from '../components/app/ForumSection';
 import InsiderSection from '../components/app/InsiderSection';
 import AuditLogPage from './AuditLogPage';
@@ -26,7 +26,7 @@ const AppShell: React.FC = () => {
 
   const tabs = [
     { id: 'search', label: 'Search', icon: <Search size={18} /> },
-    { id: 'states', label: 'States', icon: <MapPin size={18} /> },
+    { id: 'stats', label: 'Stats', icon: <BarChart2 size={18} /> },
     { id: 'forum', label: 'Industry Forum', icon: <MessageSquare size={18} /> },
     { id: 'insider', label: 'Insider', icon: <Newspaper size={18} /> },
     ...(canAccessAuditLogs
@@ -180,7 +180,7 @@ const AppShell: React.FC = () => {
                 {(activeTab) => (
                   <>
                     {activeTab === 'search' && <SearchSubmitSection />}
-                    {activeTab === 'states' && <StatesSection />}
+                    {activeTab === 'stats' && <DashboardKPIs />}
                     {activeTab === 'forum' && <ForumSection />}
                     {activeTab === 'insider' && <InsiderSection />}
                     {activeTab === 'activitylog' && (
