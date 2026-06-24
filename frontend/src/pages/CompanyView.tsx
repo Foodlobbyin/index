@@ -2,16 +2,16 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
-interface Invoice {
+interface IncidentInvoice {
   id: number;
-  invoice_number: string;
-  amount: number | null;
-  amount_unpaid: number | null;
-  issue_date: string | null;
+  incident_id: number;
+  invoice_amount: number | null;
+  unpaid_amount: number | null;
+  invoice_date: string | null;
   due_date: string | null;
-  status: string;
-  category: string | null;
   item_sold: string | null;
+  currency_code: string;
+  category: string | null;
 }
 
 interface ContactPerson {
@@ -28,12 +28,11 @@ interface CompanyViewData {
   gstn: string;
   total_invoices: number;
   total_unpaid: number;
-  invoices: Invoice[];
+  invoices: IncidentInvoice[];
   contact_persons: ContactPerson[];
 }
 
-function daysOverdue(dueDateStr: string | null, status: string): number | null {
-  if (status === 'paid') return null;
+function daysOverdue(dueDateStr: string | null): number | null {
   if (!dueDateStr) return null;
   const due = new Date(dueDateStr);
   const today = new Date();
@@ -136,8 +135,6 @@ export default function CompanyView(): JSX.Element {
     );
   }
 
-  const unpaidInvoices = data.invoices.filter(i => i.status !== 'paid');
-
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto', padding: '32px 16px' }}>
       {/* Back */}
@@ -181,12 +178,12 @@ export default function CompanyView(): JSX.Element {
       <div style={card}>
         <h2 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: '#111827' }}>
           Unpaid Invoices
-          {unpaidInvoices.length > 0 && (
+          {data.invoices.length > 0 && (
             <span style={{
               marginLeft: 10, padding: '2px 10px', backgroundColor: '#fee2e2',
               color: '#991b1b', borderRadius: 12, fontSize: 12, fontWeight: 600,
             }}>
-              {unpaidInvoices.length} unpaid
+              {data.invoices.length} unpaid
             </span>
           )}
         </h2>
@@ -215,8 +212,8 @@ export default function CompanyView(): JSX.Element {
               </thead>
               <tbody>
                 {data.invoices.map((inv, idx) => {
-                  const overdue = daysOverdue(inv.due_date, inv.status);
-                  const unpaidAmt = inv.amount_unpaid ?? inv.amount;
+                  const overdue = daysOverdue(inv.due_date);
+                  const unpaidAmt = inv.unpaid_amount ?? inv.invoice_amount;
                   return (
                     <tr
                       key={inv.id}
@@ -226,22 +223,18 @@ export default function CompanyView(): JSX.Element {
                         {idx + 1}
                       </td>
                       <td style={{ padding: '10px 14px', color: '#374151', whiteSpace: 'nowrap' }}>
-                        {formatDate(inv.issue_date)}
+                        {formatDate(inv.invoice_date)}
                       </td>
                       <td style={{ padding: '10px 14px', color: '#374151', whiteSpace: 'nowrap' }}>
                         {formatDate(inv.due_date)}
                       </td>
                       <td style={{ padding: '10px 14px', color: '#111827', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                        {formatAmount(inv.amount)}
+                        {formatAmount(inv.invoice_amount)}
                       </td>
                       <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                        {inv.status === 'paid' ? (
-                          <span style={{ color: '#16a34a', fontWeight: 600 }}>Paid</span>
-                        ) : (
-                          <span style={{ color: '#dc2626', fontWeight: 700 }}>
-                            {formatAmount(unpaidAmt)}
-                          </span>
-                        )}
+                        <span style={{ color: '#dc2626', fontWeight: 700 }}>
+                          {formatAmount(unpaidAmt)}
+                        </span>
                       </td>
                       <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
                         {overdue !== null ? (
