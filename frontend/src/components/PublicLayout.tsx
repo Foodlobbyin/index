@@ -21,10 +21,15 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-green-700 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-xl">F</span>
               </div>
-              <span className="text-xl font-bold text-gray-900">Foodlobbyin</span>
+              <div>
+                <span className="text-xl font-bold text-gray-900">Foodlobby</span>
+                <span className="hidden sm:block text-xs text-gray-500 leading-none -mt-0.5">
+                  Trade Fraud Protection Network
+                </span>
+              </div>
             </Link>
 
             {/* Desktop Navigation */}
@@ -32,21 +37,23 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               <Link
                 to="/"
                 className={`${
-                  isActive('/') ? 'text-blue-600' : 'text-gray-700'
-                } hover:text-blue-600 transition-colors`}
+                  isActive('/') ? 'text-green-700 font-semibold' : 'text-gray-700'
+                } hover:text-green-700 transition-colors`}
               >
                 Home
               </Link>
               <Link
                 to="/news"
                 className={`${
-                  isActive('/news') ? 'text-blue-600' : 'text-gray-700'
-                } hover:text-blue-600 transition-colors`}
+                  isActive('/news') ? 'text-green-700 font-semibold' : 'text-gray-700'
+                } hover:text-green-700 transition-colors`}
               >
-                News & Updates
+                Alerts & Updates
               </Link>
               <Link to="/login">
-                <Button>Sign In</Button>
+                <Button className="bg-green-700 hover:bg-green-800 text-white">
+                  Member Sign In
+                </Button>
               </Link>
             </div>
 
@@ -65,8 +72,8 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               <Link
                 to="/"
                 className={`block ${
-                  isActive('/') ? 'text-blue-600' : 'text-gray-700'
-                } hover:text-blue-600 transition-colors`}
+                  isActive('/') ? 'text-green-700 font-semibold' : 'text-gray-700'
+                } hover:text-green-700 transition-colors`}
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Home
@@ -74,14 +81,16 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               <Link
                 to="/news"
                 className={`block ${
-                  isActive('/news') ? 'text-blue-600' : 'text-gray-700'
-                } hover:text-blue-600 transition-colors`}
+                  isActive('/news') ? 'text-green-700 font-semibold' : 'text-gray-700'
+                } hover:text-green-700 transition-colors`}
                 onClick={() => setMobileMenuOpen(false)}
               >
-                News & Updates
+                Alerts & Updates
               </Link>
               <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
-                <Button fullWidth>Sign In</Button>
+                <Button fullWidth className="bg-green-700 hover:bg-green-800 text-white">
+                  Member Sign In
+                </Button>
               </Link>
             </div>
           )}
@@ -96,14 +105,18 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-3 gap-8">
             <div>
-              <h3 className="text-lg font-semibold mb-4">Foodlobbyin</h3>
-              <p className="text-gray-400">
-                B2B directory and invoice intelligence for the food & spice industry
+              <h3 className="text-lg font-semibold mb-3">Foodlobby</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                A community-driven platform to report trade fraud, credit defaults, and
+                payment scams in India's food &amp; spice commodity sector.
+              </p>
+              <p className="text-gray-600 text-xs mt-3">
+                Invite-only &middot; Verified members only
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
-              <ul className="space-y-2">
+              <h3 className="text-lg font-semibold mb-3">Quick Links</h3>
+              <ul className="space-y-2 text-sm">
                 <li>
                   <Link to="/" className="text-gray-400 hover:text-white transition-colors">
                     Home
@@ -111,26 +124,29 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
                 </li>
                 <li>
                   <Link to="/news" className="text-gray-400 hover:text-white transition-colors">
-                    News & Updates
+                    Alerts &amp; Updates
                   </Link>
                 </li>
                 <li>
                   <Link to="/login" className="text-gray-400 hover:text-white transition-colors">
-                    Sign In
+                    Member Sign In
                   </Link>
                 </li>
               </ul>
             </div>
             <div>
-              <h3 className="text-lg font-semibold mb-4">Support</h3>
-              <ul className="space-y-2">
-                <li className="text-gray-400">Email: support@foodlobbyin.com</li>
-                <li className="text-gray-400">Phone: +91 1234567890</li>
+              <h3 className="text-lg font-semibold mb-3">Contact</h3>
+              <ul className="space-y-2 text-sm">
+                <li className="text-gray-400">Email: support@foodlobby.in</li>
+                <li className="text-gray-400">Junagadh, Gujarat, India</li>
               </ul>
             </div>
           </div>
-          <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-400">
-            <p>&copy; 2024 Foodlobbyin. All rights reserved.</p>
+          <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-500 text-sm">
+            <p>
+              &copy; {new Date().getFullYear()} Foodlobby. All rights reserved.
+              &nbsp;&middot;&nbsp; Protecting India's food &amp; spice trade community.
+            </p>
           </div>
         </div>
       </footer>

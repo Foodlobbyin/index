@@ -387,7 +387,7 @@ router.post('/invite-direct', async (c) => {
     <div style="background:linear-gradient(135deg,#15803d 0%,#166534 100%);padding:36px 44px;text-align:center">
       <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:800;letter-spacing:-0.5px">🌿 Foodlobby</h1>
       <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:13px;letter-spacing:0.3px">
-        India's Verified B2B Food &amp; Spice Commodity Network
+        India's Food &amp; Spice Trade Fraud Protection Network
       </p>
     </div>
 
@@ -401,24 +401,30 @@ router.post('/invite-direct', async (c) => {
       ${company ? `<p style="margin:0 0 24px;font-size:14px;color:#6b7280">Representing <strong style="color:#374151">${company}</strong></p>` : '<div style="margin-bottom:24px"></div>'}
 
       <p style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#374151">
-        We are delighted to personally invite you to <strong>Foodlobby</strong> — an exclusive,
-        invite-only B2B platform built for verified food &amp; spice commodity professionals across India.
+        You are personally invited to join <strong>Foodlobby</strong> — an invite-only, community-driven
+        platform that helps food &amp; spice commodity professionals in India protect themselves from
+        <strong>trade fraud, credit defaults, and payment scams</strong>.
+      </p>
+
+      <p style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#374151">
+        Before you extend credit to a new buyer, Foodlobby lets you search if others in the community
+        have already been cheated by them.
       </p>
 
       <!-- Feature pills -->
-      <div style="background:#f9fafb;border-radius:10px;padding:20px 24px;margin-bottom:24px;border:1px solid #e5e7eb">
-        <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.5px">What you get as a member</p>
+      <div style="background:#fff7ed;border-radius:10px;padding:20px 24px;margin-bottom:24px;border:1px solid #fed7aa">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:0.5px">How Foodlobby protects you</p>
         <table style="border-collapse:collapse;width:100%">
           <tr>
-            <td style="padding:5px 0;font-size:14px;color:#374151;width:50%">✅ Verified company directory</td>
-            <td style="padding:5px 0;font-size:14px;color:#374151">✅ Invoice &amp; payment tracker</td>
+            <td style="padding:6px 0;font-size:14px;color:#374151;width:50%">🔍 Search fraud incident reports</td>
+            <td style="padding:6px 0;font-size:14px;color:#374151">🚨 Report credit defaults &amp; scams</td>
           </tr>
           <tr>
-            <td style="padding:5px 0;font-size:14px;color:#374151">✅ Incident &amp; fraud reporting</td>
-            <td style="padding:5px 0;font-size:14px;color:#374151">✅ Reputation management</td>
+            <td style="padding:6px 0;font-size:14px;color:#374151">⭐ Community reputation scores</td>
+            <td style="padding:6px 0;font-size:14px;color:#374151">📄 Evidence &amp; invoice logging</td>
           </tr>
           <tr>
-            <td style="padding:5px 0;font-size:14px;color:#374151" colspan="2">✅ Community forum for commodity professionals</td>
+            <td style="padding:6px 0;font-size:14px;color:#374151" colspan="2">💬 Community forum for trade professionals <em style="color:#9ca3af">(coming soon)</em></td>
           </tr>
         </table>
       </div>
@@ -473,7 +479,7 @@ router.post('/invite-direct', async (c) => {
       body: JSON.stringify({
         from: (c.env as any).EMAIL_FROM || 'noreply@foodlobby.in',
         to: [email.toLowerCase()],
-        subject: `${name}, you're personally invited to join Foodlobby`,
+        subject: `${name}, you're invited to join Foodlobby — Protect your trade`,
         html,
       }),
     });

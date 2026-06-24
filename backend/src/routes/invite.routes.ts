@@ -156,13 +156,33 @@ async function sendInviteEmail(
     : `${senderName || 'A community member'} has invited you to Foodlobby`;
 
   const html = `
-    <div style="font-family:sans-serif;max-width:520px;margin:auto">
-      <h2 style="color:#16a34a">You have been invited to Foodlobby</h2>
-      ${type === 'member' ? `<p><strong>${senderName}</strong> thought you'd be a great fit for the Foodlobby B2B community.</p>` : '<p>Our team has selected you to join the Foodlobby B2B community.</p>'}
-      <p>Foodlobby is a verified B2B platform for food & spice commodity professionals in India.</p>
-      <a href="${inviteUrl}" style="display:inline-block;margin:20px 0;padding:12px 28px;background:#16a34a;color:white;border-radius:6px;text-decoration:none;font-weight:bold">Accept Invite & Register</a>
-      <p style="color:#6b7280;font-size:13px">This link is valid for 30 days and can only be used once. It is tied to this email address — please register using <strong>${toEmail}</strong>.</p>
-      <p style="color:#6b7280;font-size:13px">If this link has expired, you can request a new invite from the registration page.</p>
+    <div style="font-family:sans-serif;max-width:520px;margin:auto;background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+      <div style="background:#15803d;padding:28px 32px;text-align:center">
+        <h2 style="margin:0;color:#ffffff;font-size:22px;font-weight:700">🌿 Foodlobby</h2>
+        <p style="margin:6px 0 0;color:rgba(255,255,255,0.8);font-size:12px">India's Food &amp; Spice Trade Fraud Protection Network</p>
+      </div>
+      <div style="padding:28px 32px">
+        ${type === 'member'
+          ? `<p style="font-size:15px;color:#374151">You have been personally invited by <strong>${senderName}</strong> to join Foodlobby.</p>`
+          : `<p style="font-size:15px;color:#374151">You have been personally selected by the Foodlobby team to join our platform.</p>`}
+        <p style="font-size:15px;color:#374151;line-height:1.65">
+          <strong>Foodlobby</strong> is a community-driven platform that helps food &amp; spice commodity
+          professionals protect themselves from <strong>trade fraud, credit defaults, and payment scams</strong> in India.
+          Search if a buyer has cheated others before you extend credit to them.
+        </p>
+        <div style="text-align:center;margin:28px 0">
+          <a href="${inviteUrl}" style="display:inline-block;padding:13px 32px;background:#15803d;color:white;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px">Accept Invitation &amp; Register →</a>
+        </div>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:7px;padding:12px 16px">
+          <p style="margin:0;font-size:12px;color:#166534">
+            <strong>Note:</strong> This invite is valid for 30 days, single-use, and locked to <strong>${toEmail}</strong>.
+            Please register using this email address.
+          </p>
+        </div>
+      </div>
+      <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px 32px;text-align:center">
+        <p style="margin:0;font-size:11px;color:#9ca3af">&copy; ${new Date().getFullYear()} Foodlobby &middot; <a href="https://foodlobby.in" style="color:#15803d;text-decoration:none">foodlobby.in</a></p>
+      </div>
     </div>
   `;
 
