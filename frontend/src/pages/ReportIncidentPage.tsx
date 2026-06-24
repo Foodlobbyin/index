@@ -28,7 +28,7 @@ interface ContactPerson {
   phone: string;
 }
 
-interface ExtendedFormData extends IncidentCreateInput {
+interface ExtendedFormData extends Omit<IncidentCreateInput, 'invoice_amount' | 'unpaid_amount'> {
   state: string;
   pincode: string;
   street_address: string;
