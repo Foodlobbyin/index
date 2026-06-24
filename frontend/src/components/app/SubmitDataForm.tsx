@@ -281,12 +281,12 @@ const SubmitDataForm: React.FC = () => {
               <Input
                 type="email"
                 name="contactEmail"
-                label="Email Address"
+                label="Email Address (Optional)"
                 placeholder="contact@example.com"
                 value={formData.contactEmail}
                 onChange={handleChange}
-                required
                 fullWidth
+                helperText="Email is optional — many small businesses communicate via phone only"
               />
               <Input
                 type="text"
