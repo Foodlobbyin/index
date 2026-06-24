@@ -1,7 +1,6 @@
 import React from 'react';
 import DashboardKPIs from './DashboardKPIs';
 import SearchPanel from './SearchPanel';
-import SubmitDataForm from './SubmitDataForm';
 
 const SearchSubmitSection: React.FC = () => {
   return (
@@ -12,14 +11,9 @@ const SearchSubmitSection: React.FC = () => {
         <DashboardKPIs />
       </section>
 
-      {/* Search Panel */}
+      {/* Search Panel — search by GSTIN or phone number */}
       <section>
         <SearchPanel />
-      </section>
-
-      {/* Submit Data Form */}
-      <section>
-        <SubmitDataForm />
       </section>
     </div>
   );
