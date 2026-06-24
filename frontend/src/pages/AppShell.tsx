@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Navigate, NavLink, Routes, Route, useLocation } from 'react-router-dom';
-import { Search, MessageSquare, LogOut, User, ClipboardList, AlertTriangle, Shield, FileText, Settings } from 'lucide-react';
+import { Search, MessageSquare, LogOut, User, ClipboardList, AlertTriangle, Shield, FileText, Settings, KeyRound } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Tabs from '../components/ui/Tabs';
 import SearchSubmitSection from '../components/app/SearchSubmitSection';
@@ -138,6 +138,16 @@ const AppShell: React.FC = () => {
                         >
                           <Settings size={16} className="mr-2" />
                           Admin Panel
+                        </a>
+                      )}
+                      {isAdmin && (
+                        <a
+                          href="/admin/profile"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                          style={{ display: 'flex', textDecoration: 'none' }}
+                        >
+                          <KeyRound size={16} className="mr-2" />
+                          My Profile
                         </a>
                       )}
                       <button
