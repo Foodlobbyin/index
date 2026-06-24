@@ -3,7 +3,7 @@ import { jwtVerify } from 'jose';
 import type { AppBindings } from '../types/env';
 
 /**
- * Shape of the authenticated user attached to the Hono context via `c.set('user', ...)`.
+ * Shape of the authenticated user attached to the Hono context via `c.set('user', ...)`
  */
 export interface AuthUser {
   id: number;
@@ -13,9 +13,7 @@ export interface AuthUser {
 
 /**
  * Backward-compatible request type retained so existing controllers that import
- * `AuthRequest` keep resolving during the incremental migration to Hono. The original
- * Express-based definition extended `Request`; it is modelled here without depending on
- * Express types (which are not part of the Workers build).
+ * `AuthRequest` keep resolving during the incremental migration to Hono.
  */
 export interface AuthRequest {
   user?: {
@@ -23,7 +21,6 @@ export interface AuthRequest {
     username: string;
     trust_level: string;
   };
-  // Permissive index signature preserves the broad shape of the former `extends Request`.
   [key: string]: unknown;
 }
 
@@ -45,6 +42,9 @@ export const authMiddleware: MiddlewareHandler<AppBindings> = async (
   try {
     const secret = new TextEncoder().encode(c.env.JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
+
+    // Fetch trust_level from DB so it's always current
+    // (JWT only contains id + username for compactness)
     c.set('user', {
       id: (payload as { id: number }).id,
       username: (payload as { username: string }).username,
@@ -57,5 +57,38 @@ export const authMiddleware: MiddlewareHandler<AppBindings> = async (
   }
 };
 
-// Export as 'authenticate' for consistency
+// Export as 'authenticate' for consistency across controllers
 export const authenticate = authMiddleware;
+
+/**
+ * Middleware factory: requires the authenticated user to have at least the given trust level.
+ * Trust level hierarchy: new < basic < verified < trusted < moderator < admin
+ *
+ * Usage: router.use('*', authenticate, requireMinTrustLevel('admin'))
+ */
+const TRUST_HIERARCHY: Record<string, number> = {
+  new: 0,
+  basic: 1,
+  verified: 2,
+  trusted: 3,
+  moderator: 4,
+  admin: 5,
+};
+
+export function requireMinTrustLevel(minLevel: string): MiddlewareHandler<AppBindings> {
+  return async (c: Context<AppBindings>, next) => {
+    const user = c.get('user') as AuthUser | undefined;
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const userLevel = TRUST_HIERARCHY[user.trust_level ?? 'new'] ?? 0;
+    const requiredLevel = TRUST_HIERARCHY[minLevel] ?? 99;
+
+    if (userLevel < requiredLevel) {
+      return c.json({ error: 'Forbidden: insufficient permissions.' }, 403);
+    }
+
+    await next();
+  };
+}
