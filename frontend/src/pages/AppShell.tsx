@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Navigate, NavLink, Routes, Route, useLocation } from 'react-router-dom';
-import { Search, MessageSquare, LogOut, User, ClipboardList, AlertTriangle, Shield, FileText } from 'lucide-react';
+import { Search, MessageSquare, LogOut, User, ClipboardList, AlertTriangle, Shield, FileText, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Tabs from '../components/ui/Tabs';
 import SearchSubmitSection from '../components/app/SearchSubmitSection';
@@ -20,6 +20,7 @@ const AppShell: React.FC = () => {
 
   const canAccessAuditLogs = !!user?.trust_level && AUDIT_LOG_TRUST_LEVELS.includes(user.trust_level);
   const isModerator = canAccessAuditLogs;
+  const isAdmin = user?.trust_level === 'admin';
 
   const tabs = [
     { id: 'search', label: 'Search & Submit', icon: <Search size={18} /> },
@@ -81,10 +82,19 @@ const AppShell: React.FC = () => {
                   <span>Moderation</span>
                 </NavLink>
               )}
-            <NavLink to="/app/invoices" className={navLinkClass}>
+              <NavLink to="/app/invoices" className={navLinkClass}>
                 <FileText size={16} />
                 <span>Invoices</span>
               </NavLink>
+              {isAdmin && (
+                <a
+                  href="/admin"
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-green-700 hover:bg-green-50 hover:text-green-800 border border-green-200"
+                >
+                  <Settings size={16} />
+                  <span>Admin Panel</span>
+                </a>
+              )}
             </nav>
 
             {/* User Menu */}
@@ -114,7 +124,22 @@ const AppShell: React.FC = () => {
                           {user?.first_name || user?.username}
                         </p>
                         <p className="text-xs text-gray-500">{user?.email}</p>
+                        {isAdmin && (
+                          <span className="inline-block mt-1 px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-700 rounded-full">
+                            Admin
+                          </span>
+                        )}
                       </div>
+                      {isAdmin && (
+                        <a
+                          href="/admin"
+                          className="w-full px-4 py-2 text-left text-sm text-green-700 hover:bg-green-50 flex items-center"
+                          style={{ display: 'flex', textDecoration: 'none' }}
+                        >
+                          <Settings size={16} className="mr-2" />
+                          Admin Panel
+                        </a>
+                      )}
                       <button
                         onClick={handleLogout}
                         className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center"
