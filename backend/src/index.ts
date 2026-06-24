@@ -12,6 +12,7 @@ import moderationRoutes from './routes/moderation.routes';
 import reputationRoutes from './routes/reputation.routes';
 import auditLogRoutes from './routes/auditLog.routes';
 import adminRoutes from './routes/admin.routes';
+import adminSetupRoutes from './routes/admin-setup.routes';
 import inviteRoutes from './routes/invite.routes';
 import waitlistRoutes from './routes/waitlist.routes';
 import healthRoutes from './routes/health';
@@ -56,6 +57,7 @@ app.route('/api/incidents', incidentRoutes);
 app.route('/api/moderation', moderationRoutes);
 app.route('/api/reputation', reputationRoutes);
 app.route('/api/audit-logs', auditLogRoutes);
+app.route('/api/admin', adminSetupRoutes); // setup (no auth guard) must come BEFORE adminRoutes
 app.route('/api/admin', adminRoutes);
 
 // 404 handler
