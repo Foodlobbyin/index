@@ -154,7 +154,7 @@ const ModerationQueuePage: React.FC = () => {
                         {incident.incident_type.replace(/_/g, ' ')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(incident.incident_date).toLocaleDateString()}
+                        {incident.incident_date ? new Date(incident.incident_date).toLocaleDateString() : "—"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {incident.is_anonymous
