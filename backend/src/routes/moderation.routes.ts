@@ -14,6 +14,7 @@ router.use(apiLimiter);
 router.use(authMiddleware);
 
 router.get('/queue', requireMinTrustLevel('moderator'), moderationController.getQueue);
+router.put('/incidents/:id/review', requireMinTrustLevel('moderator'), moderationController.markUnderReview);
 router.put('/incidents/:id/approve', requireMinTrustLevel('moderator'), moderationController.approve);
 router.put('/incidents/:id/reject', requireMinTrustLevel('moderator'), moderationController.reject);
 router.post('/incidents/:id/penalty', requireMinTrustLevel('moderator'), moderationController.addPenalty);

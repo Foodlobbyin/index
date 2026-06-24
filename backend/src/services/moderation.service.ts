@@ -11,6 +11,20 @@ export class ModerationService {
     return incidentRepository.getModerationQueue(db);
   }
 
+  async markUnderReview(db: DbClient, id: number, moderatorId: number): Promise<Incident> {
+    const incident = await incidentRepository.findById(db, id);
+    if (!incident) throw new Error('Incident not found');
+    if (incident.status !== 'submitted') throw new Error('Only submitted incidents can be marked under review');
+
+    const updated = await incidentRepository.updateStatus(db, id, 'under_review', {
+      reviewed_by: moderatorId,
+    });
+    if (!updated) throw new Error('Failed to update incident status');
+
+    await this.logModerationAction(db, id, moderatorId, 'under_review');
+    return updated;
+  }
+
   async approveIncident(db: DbClient, id: number, moderatorId: number, notes?: string): Promise<Incident> {
     const incident = await incidentRepository.findById(db, id);
     if (!incident) throw new Error('Incident not found');

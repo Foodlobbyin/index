@@ -4,6 +4,21 @@ import { createDbClient } from '../config/database';
 import moderationService from '../services/moderation.service';
 
 export class ModerationController {
+  async markUnderReview(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
+    try {
+      const user = c.get('user');
+      if (!user) return c.json({ error: 'Authentication required' }, 401);
+      const id = parseInt(c.req.param('id')!, 10);
+      if (isNaN(id)) return c.json({ error: 'Invalid incident ID' }, 400);
+      const incident = await moderationService.markUnderReview(db, id, user.id);
+      return c.json({ message: 'Incident marked under review', incident });
+    } catch (error: any) {
+      if (error.message === 'Incident not found') return c.json({ error: error.message }, 404);
+      return c.json({ error: error.message }, 400);
+    }
+  }
+
   async getQueue(c: Context<AppBindings>): Promise<Response> {
     const db = createDbClient(c.env.DATABASE_URL);
     try {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Navigate, NavLink, Routes, Route, useLocation } from 'react-router-dom';
-import { Search, MessageSquare, LogOut, User, ClipboardList, AlertTriangle, Shield, FileText, Settings, KeyRound } from 'lucide-react';
+import { Search, MessageSquare, LogOut, User, ClipboardList, AlertTriangle, Shield, FileText, Settings, KeyRound, BookOpen } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Tabs from '../components/ui/Tabs';
 import SearchSubmitSection from '../components/app/SearchSubmitSection';
@@ -10,6 +10,7 @@ import IncidentListPage from './IncidentListPage';
 import ReportIncidentPage from './ReportIncidentPage';
 import IncidentDetailPage from './IncidentDetailPage';
 import ModerationQueuePage from './ModerationQueuePage';
+import MyIncidentsPage from './MyIncidentsPage';
 
 const AUDIT_LOG_TRUST_LEVELS: ReadonlyArray<'moderator' | 'admin'> = ['moderator', 'admin'];
 
@@ -75,6 +76,10 @@ const AppShell: React.FC = () => {
               <NavLink to="/app/incidents" className={navLinkClass}>
                 <AlertTriangle size={16} />
                 <span>Incidents</span>
+              </NavLink>
+              <NavLink to="/app/my-incidents" className={navLinkClass}>
+                <BookOpen size={16} />
+                <span>My Reports</span>
               </NavLink>
               {isModerator && (
                 <NavLink to="/app/moderation" className={navLinkClass}>
@@ -190,6 +195,8 @@ const AppShell: React.FC = () => {
           <Route path="incidents" element={<IncidentListPage />} />
           <Route path="incidents/new" element={<ReportIncidentPage />} />
           <Route path="incidents/:id" element={<IncidentDetailPage />} />
+          {/* My Incidents */}
+          <Route path="my-incidents" element={<MyIncidentsPage />} />
           {/* Moderation */}
           <Route
             path="moderation"

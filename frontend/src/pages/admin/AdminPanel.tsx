@@ -7,9 +7,11 @@ import AdminWaitlist from './AdminWaitlist';
 import AdminUsers from './AdminUsers';
 import AdminInvites from './AdminInvites';
 import AdminProfile from './AdminProfile';
+import AdminModerationPage from './AdminModerationPage';
 
 const NAV = [
   { path: '/admin', label: '📊 Dashboard', exact: true },
+  { path: '/admin/moderation', label: '🛡️ Moderation', exact: true },
   { path: '/admin/pending', label: '⏳ Pending Review', exact: true },
   { path: '/admin/waitlist', label: '📋 Waitlist', exact: true },
   { path: '/admin/users', label: '👥 Users', exact: true },
@@ -135,6 +137,7 @@ export default function AdminPanel(): JSX.Element {
       <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
         <Routes>
           <Route index element={<AdminDashboard />} />
+          <Route path="moderation" element={<AdminModerationPage />} />
           <Route path="pending" element={<AdminPending />} />
           <Route path="waitlist" element={<AdminWaitlist />} />
           <Route path="users" element={<AdminUsers />} />
