@@ -28,7 +28,7 @@ interface ContactPerson {
   phone: string;
 }
 
-interface ExtendedFormData extends Omit<IncidentCreateInput, 'invoice_amount' | 'unpaid_amount' | 'incident_date' | 'incident_title' | 'description'> {
+interface ExtendedFormData extends Omit<IncidentCreateInput, 'invoice_amount' | 'unpaid_amount' | 'incident_date' | 'incident_title'> {
   state: string;
   pincode: string;
   street_address: string;
@@ -63,6 +63,7 @@ const ReportIncidentPage: React.FC = () => {
     incident_type: 'FRAUD',
     invoice_amount: '',
     unpaid_amount: '',
+    description: '',
     invoice_date: '',
     due_date: '',
     item_sold: '',
@@ -144,7 +145,7 @@ const ReportIncidentPage: React.FC = () => {
         incident_type: formData.incident_type,
         incident_date: new Date().toISOString().split('T')[0], // auto-set to today
         incident_title: `${formData.incident_type} - ${formData.company_name}`, // auto-generated
-        description: '', // not collected from user — backend requires non-null
+        description: formData.description || '',
         invoice_amount: invoiceAmt,
         unpaid_amount: unpaidAmt,
         invoice_date: formData.invoice_date || undefined,
@@ -444,6 +445,18 @@ const ReportIncidentPage: React.FC = () => {
                   value={formData.item_sold}
                   onChange={handleChange}
                   placeholder="e.g. Cumin Seeds 100kg (optional)"
+                />
+              </div>
+
+              {/* Description (optional but backend requires it) */}
+              <div>
+                <label className={labelClass}>Additional Details</label>
+                <textarea
+                  name="description"
+                  className={`${inputClass} resize-y min-h-[80px]`}
+                  value={formData.description ?? ''}
+                  onChange={handleChange}
+                  placeholder="Any additional context about the incident (optional)"
                 />
               </div>
 
