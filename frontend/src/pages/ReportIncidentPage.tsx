@@ -359,11 +359,18 @@ const ReportIncidentPage: React.FC = () => {
                     className={`${inputClass} ${gstnLookupStatus === 'found' ? 'border-green-400 bg-green-50' : ''}`}
                     value={formData.company_gstn}
                     onChange={handleChange}
-                    onBlur={handleGstnBlur}
                     placeholder="e.g. 29ABCDE1234F1Z5"
                     required
                     maxLength={15}
                   />
+                  <button
+                    type="button"
+                    onClick={handleGstnBlur}
+                    disabled={gstnLookupStatus === 'loading' || formData.company_gstn.trim().length < 10}
+                    className="absolute right-2 top-1.5 px-2.5 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {gstnLookupStatus === 'loading' ? 'Looking…' : 'Lookup'}
+                  </button>
                   {gstnLookupStatus === 'loading' && (
                     <span className="absolute right-3 top-2.5 text-xs text-gray-400">Looking up…</span>
                   )}
@@ -573,14 +580,23 @@ const ReportIncidentPage: React.FC = () => {
                       {/* Phone first so lookup fires before other fields */}
                       <div>
                         <label className={labelClass}>Phone Number</label>
-                        <input
-                          type="tel"
-                          className={inputClass}
-                          placeholder="Phone — auto-fills other fields"
-                          value={contact.phone}
-                          onChange={(e) => handleContactChange(index, 'phone', e.target.value)}
-                          onBlur={() => handleContactPhoneBlur(index)}
-                        />
+                        <div className="relative">
+                          <input
+                            type="tel"
+                            className={inputClass}
+                            placeholder="Phone — click Lookup to auto-fill"
+                            value={contact.phone}
+                            onChange={(e) => handleContactChange(index, 'phone', e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleContactPhoneBlur(index)}
+                            disabled={phoneLookupStatus[index] === 'loading' || contact.phone.replace(/\D/g, '').length < 5}
+                            className="absolute right-2 top-1.5 px-2.5 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {phoneLookupStatus[index] === 'loading' ? 'Looking…' : 'Lookup'}
+                          </button>
+                        </div>
                       </div>
                       <div>
                         <label className={labelClass}>Full Name {index === 0 && <span className="text-red-500">*</span>}</label>
