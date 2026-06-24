@@ -131,6 +131,11 @@ export const incidentService = {
     return response.data.incident ?? response.data;
   },
 
+  async submitForReview(id: number): Promise<Incident> {
+    const response = await api.put(`/incidents/${id}/submit`);
+    return response.data.incident ?? response.data;
+  },
+
   async update(id: number, data: IncidentUpdateInput): Promise<Incident> {
     const response = await api.put(`/incidents/${id}`, data);
     return response.data.incident ?? response.data;

@@ -39,6 +39,43 @@ export class IncidentController {
     }
   }
 
+  async submitForReview(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
+    try {
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Authentication required' }, 401);
+      }
+      const id = parseInt(c.req.param('id')!, 10);
+      if (isNaN(id)) {
+        return c.json({ error: 'Invalid incident ID' }, 400);
+      }
+      const incident = await incidentService.submitIncident(db, id, user.id);
+
+      try {
+        await auditLogService.writeLog(db, {
+          user_id: user.id,
+          action: 'incident_submitted_for_review',
+          entity_type: 'incident',
+          entity_id: id,
+          details: { incident_id: id, status: incident.status },
+          ip_address:
+            c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown',
+        });
+      } catch { /* audit log failure must not break the main action */ }
+
+      return c.json({ message: 'Incident submitted for review', incident });
+    } catch (error: any) {
+      if (error.message === 'Access denied') {
+        return c.json({ error: error.message }, 403);
+      }
+      if (error.message === 'Incident not found') {
+        return c.json({ error: error.message }, 404);
+      }
+      return c.json({ error: error.message }, 400);
+    }
+  }
+
   async search(c: Context<AppBindings>): Promise<Response> {
     const db = createDbClient(c.env.DATABASE_URL);
     try {

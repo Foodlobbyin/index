@@ -29,6 +29,7 @@ const MyIncidentsPage: React.FC = () => {
   const [incLoading, setIncLoading] = useState(true);
   const [incError, setIncError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [submittingId, setSubmittingId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Incident | null>(null);
 
   // Invoices state
@@ -118,6 +119,25 @@ const MyIncidentsPage: React.FC = () => {
       setIncError(msg);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleSubmitForReview = async (incident: Incident) => {
+    setSubmittingId(incident.id);
+    setIncError(null);
+    try {
+      const updated = await incidentService.submitForReview(incident.id);
+      setIncidents((prev) =>
+        prev.map((i) => (i.id === incident.id ? { ...i, status: updated.status } : i))
+      );
+    } catch (err: unknown) {
+      const msg =
+        (err as any)?.response?.data?.error ??
+        (err as any)?.response?.data?.message ??
+        'Failed to submit incident for review.';
+      setIncError(msg);
+    } finally {
+      setSubmittingId(null);
     }
   };
 
@@ -277,6 +297,8 @@ const MyIncidentsPage: React.FC = () => {
                 {incidents.map((incident) => {
                   const colors = statusColors[incident.status] ?? { bg: 'bg-gray-100', text: 'text-gray-600' };
                   const isDeleting = deletingId === incident.id;
+                  const isSubmitting = submittingId === incident.id;
+                  const submittable = incident.status === 'draft';
                   const editable = canEdit(incident.status);
                   const deletable = canDelete(incident.status);
 
@@ -324,6 +346,15 @@ const MyIncidentsPage: React.FC = () => {
                           >
                             View
                           </Link>
+                          {submittable && (
+                            <button
+                              onClick={() => handleSubmitForReview(incident)}
+                              disabled={isSubmitting}
+                              className="px-2.5 py-1 text-xs font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 disabled:opacity-50 transition-colors"
+                            >
+                              {isSubmitting ? 'Submitting…' : 'Submit for Review'}
+                            </button>
+                          )}
                           {editable && (
                             <Link
                               to={`/app/incidents/${incident.id}/edit`}
