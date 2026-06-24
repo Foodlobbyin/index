@@ -57,7 +57,7 @@ app.route('/api/incidents', incidentRoutes);
 app.route('/api/moderation', moderationRoutes);
 app.route('/api/reputation', reputationRoutes);
 app.route('/api/audit-logs', auditLogRoutes);
-app.route('/api/admin', adminSetupRoutes); // setup (no auth guard) must come BEFORE adminRoutes
+app.route('/api/setup', adminSetupRoutes); // one-time setup — separate path, no auth guard
 app.route('/api/admin', adminRoutes);
 
 // 404 handler
