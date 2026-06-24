@@ -28,7 +28,7 @@ interface ContactPerson {
   phone: string;
 }
 
-interface ExtendedFormData extends Omit<IncidentCreateInput, 'invoice_amount' | 'unpaid_amount'> {
+interface ExtendedFormData extends Omit<IncidentCreateInput, 'invoice_amount' | 'unpaid_amount' | 'incident_date' | 'incident_title' | 'description'> {
   state: string;
   pincode: string;
   street_address: string;
@@ -61,9 +61,6 @@ const ReportIncidentPage: React.FC = () => {
     msme_udyam_number: '',
     // Step 2 – Incident / Invoice Details
     incident_type: 'FRAUD',
-    incident_date: '',
-    incident_title: '',
-    description: '',
     invoice_amount: '',
     unpaid_amount: '',
     invoice_date: '',
@@ -145,9 +142,8 @@ const ReportIncidentPage: React.FC = () => {
         street_address: formData.street_address || undefined,
         msme_udyam_number: formData.msme_udyam_number || undefined,
         incident_type: formData.incident_type,
-        incident_date: formData.incident_date,
-        incident_title: formData.incident_title,
-        description: formData.description,
+        incident_date: new Date().toISOString().split('T')[0], // auto-set to today
+        incident_title: `${formData.incident_type} - ${formData.company_name}`, // auto-generated
         invoice_amount: invoiceAmt,
         unpaid_amount: unpaidAmt,
         invoice_date: formData.invoice_date || undefined,
@@ -375,43 +371,6 @@ const ReportIncidentPage: React.FC = () => {
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
-              </div>
-
-              {/* Incident Date */}
-              <div>
-                <label className={labelClass}>Incident Date</label>
-                <input
-                  type="date"
-                  name="incident_date"
-                  className={inputClass}
-                  value={formData.incident_date}
-                  onChange={handleChange}
-                />
-              </div>
-
-              {/* Title */}
-              <div>
-                <label className={labelClass}>Incident Title</label>
-                <input
-                  type="text"
-                  name="incident_title"
-                  className={inputClass}
-                  value={formData.incident_title}
-                  onChange={handleChange}
-                  placeholder="Brief summary of the issue (optional)"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className={labelClass}>Description</label>
-                <textarea
-                  name="description"
-                  className={`${inputClass} resize-y min-h-[100px]`}
-                  value={formData.description}
-                  onChange={handleChange}
-                  placeholder="Describe the incident in detail… (optional)"
-                />
               </div>
 
               {/* Invoice Amount + Unpaid Amount */}
