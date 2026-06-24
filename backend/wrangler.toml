@@ -19,5 +19,5 @@ NODE_ENV = "production"
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
-id = "PLACEHOLDER_KV_ID"
-preview_id = "PLACEHOLDER_KV_PREVIEW_ID"
+id = "c8bafedbc0db4644a133ab0feeb22d29"
+preview_id = "c7f1edb81ada49738faf8bf6ad171fa4"
