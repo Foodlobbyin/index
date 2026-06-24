@@ -293,6 +293,52 @@ const IncidentDetailPage: React.FC = () => {
           <p className="text-sm text-gray-900 whitespace-pre-line">{incident.description}</p>
         </div>
 
+        {/* Incident Invoices */}
+        {Array.isArray((incident as any).incident_invoices) && (incident as any).incident_invoices.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-sm font-medium text-gray-500 mb-3">Invoices in this Incident</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {['Invoice Amount', 'Unpaid Amount', 'Invoice Date', 'Due Date', 'Item/Product'].map((col) => (
+                      <th key={col} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{col}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {(incident as any).incident_invoices.map((inv: any) => (
+                    <tr key={inv.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 font-medium text-gray-900">₹{Number(inv.invoice_amount).toLocaleString('en-IN')}</td>
+                      <td className="px-3 py-2 text-red-700 font-medium">₹{Number(inv.unpaid_amount).toLocaleString('en-IN')}</td>
+                      <td className="px-3 py-2 text-gray-600">{inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString('en-IN') : '—'}</td>
+                      <td className="px-3 py-2 text-gray-600">{inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-IN') : '—'}</td>
+                      <td className="px-3 py-2 text-gray-700">{inv.item_sold || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Contact Persons */}
+        {Array.isArray((incident as any).contact_persons) && (incident as any).contact_persons.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-sm font-medium text-gray-500 mb-3">Contact Persons at Reported Company</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(incident as any).contact_persons.map((cp: any) => (
+                <div key={cp.id} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                  <p className="font-medium text-gray-900 text-sm">{cp.name}</p>
+                  {cp.position && <p className="text-xs text-gray-500 mt-0.5">{cp.position}</p>}
+                  {cp.phone && <p className="text-xs text-gray-600 mt-1">📞 {cp.phone}</p>}
+                  {cp.email && <p className="text-xs text-gray-600">{cp.email}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Moderator notes / rejection reason */}
         {incident.moderator_notes && (
           <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -452,8 +498,8 @@ const IncidentDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Moderation controls */}
-      {isModerator && (
+      {/* Moderation controls — only show if moderator AND not the reporter of this incident */}
+      {isModerator && !isReporter && (
         <div className="bg-white rounded-lg shadow-sm border border-yellow-200 p-6">
           <h3 className="text-base font-semibold text-gray-900 mb-4">Moderation Controls</h3>
           <div className="space-y-4">
