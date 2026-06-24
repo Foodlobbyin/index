@@ -20,10 +20,13 @@ export interface User {
   otp_verification_count: number;
   otp_last_generated_at?: Date;
   otp_last_verified_at?: Date;
-  trust_level: 'new' | 'verified' | 'trusted' | 'moderator' | 'admin';
+  trust_level: 'new' | 'basic' | 'verified' | 'trusted' | 'moderator' | 'admin';
   approved_incidents_count: number;
   incidents_always_anonymous: boolean;
   forums_default_anonymous: boolean;
+  registration_status: 'active' | 'pending_review' | 'waitlist' | 'declined';
+  invite_token_id?: number;
+  can_send_invites: boolean;
   created_at: Date;
 }
 
@@ -37,7 +40,11 @@ export interface UserCreateInput {
   first_name?: string;
   last_name?: string;
   gstn: string;
-  referral_code: string;
+  // Legacy field kept for backward compat with referral system
+  referral_code?: string;
+  // New invite system fields
+  invite_token_id?: number;
+  registration_status?: 'active' | 'pending_review';
 }
 
 // Legacy interface for backward compatibility with old auth endpoints
@@ -71,7 +78,9 @@ export interface UserResponse {
   gstn?: string;
   email_verified: boolean;
   account_activated: boolean;
-  trust_level: 'new' | 'verified' | 'trusted' | 'moderator' | 'admin';
+  trust_level: 'new' | 'basic' | 'verified' | 'trusted' | 'moderator' | 'admin';
+  registration_status?: 'active' | 'pending_review' | 'waitlist' | 'declined';
+  can_send_invites?: boolean;
   created_at: Date;
 }
 
