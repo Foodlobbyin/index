@@ -3,12 +3,12 @@ import { Invoice, InvoiceCreateInput, InvoiceUpdateInput, MarketInsights } from 
 
 export class InvoiceRepository {
   async create(db: DbClient, companyId: number, invoice: InvoiceCreateInput): Promise<Invoice> {
-    const { invoice_number, amount, issue_date, due_date, status, description, category } = invoice;
+    const { invoice_number, amount, amount_unpaid, issue_date, due_date, status, description, category } = invoice;
     const result = await db.query(
-      `INSERT INTO invoices (company_id, invoice_number, amount, issue_date, due_date, status, description, category) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+      `INSERT INTO invoices (company_id, invoice_number, amount, amount_unpaid, issue_date, due_date, status, description, category) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
        RETURNING *`,
-      [companyId, invoice_number, amount, issue_date, due_date, status || 'pending', description, category]
+      [companyId, invoice_number, amount, amount_unpaid ?? null, issue_date, due_date, status || 'pending', description, category]
     );
     return result.rows[0];
   }

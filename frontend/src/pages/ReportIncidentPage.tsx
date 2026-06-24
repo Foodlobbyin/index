@@ -84,7 +84,9 @@ const ReportIncidentPage: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Company GSTIN */}
           <div>
-            <label className={labelClass}>Company GSTIN</label>
+            <label className={labelClass}>
+              Company GSTIN <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               name="company_gstn"
@@ -92,6 +94,8 @@ const ReportIncidentPage: React.FC = () => {
               value={formData.company_gstn ?? ''}
               onChange={handleChange}
               placeholder="e.g. 29ABCDE1234F1Z5"
+              required
+              maxLength={15}
               disabled={loading}
             />
           </div>

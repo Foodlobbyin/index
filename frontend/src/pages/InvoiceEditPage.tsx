@@ -12,6 +12,7 @@ export default function InvoiceEditPage(): JSX.Element {
   const [formData, setFormData] = useState<InvoiceInput>({
     invoice_number: '',
     amount: 0,
+    amount_unpaid: undefined,
     issue_date: '',
     due_date: '',
     status: 'pending',
@@ -26,6 +27,7 @@ export default function InvoiceEditPage(): JSX.Element {
       setFormData({
         invoice_number: data.invoice_number,
         amount: data.amount,
+        amount_unpaid: data.amount_unpaid ?? undefined,
         issue_date: data.issue_date.split('T')[0],
         due_date: data.due_date.split('T')[0],
         status: data.status,
@@ -169,10 +171,11 @@ export default function InvoiceEditPage(): JSX.Element {
               />
             </div>
             <div>
-              <label style={labelStyle}>Amount *</label>
+              <label style={labelStyle}>Invoice Amount *</label>
               <input
                 type="number"
                 name="amount"
+                placeholder="Total invoice value"
                 value={formData.amount || ''}
                 onChange={handleChange}
                 required
@@ -181,6 +184,23 @@ export default function InvoiceEditPage(): JSX.Element {
                 style={inputStyle}
                 disabled={saving}
               />
+            </div>
+            <div>
+              <label style={labelStyle}>Amount Unpaid</label>
+              <input
+                type="number"
+                name="amount_unpaid"
+                placeholder="Outstanding balance"
+                value={formData.amount_unpaid ?? ''}
+                onChange={handleChange}
+                step="0.01"
+                min="0"
+                style={inputStyle}
+                disabled={saving}
+              />
+              <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '-10px', marginBottom: '10px' }}>
+                Leave blank if the full amount is unpaid.
+              </p>
             </div>
             <div>
               <label style={labelStyle}>Issue Date *</label>

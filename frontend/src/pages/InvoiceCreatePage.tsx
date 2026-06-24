@@ -10,6 +10,7 @@ export default function InvoiceCreatePage(): JSX.Element {
   const [formData, setFormData] = useState<InvoiceInput>({
     invoice_number: '',
     amount: 0,
+    amount_unpaid: undefined,
     issue_date: '',
     due_date: '',
     status: 'pending',
@@ -130,11 +131,11 @@ export default function InvoiceCreatePage(): JSX.Element {
               />
             </div>
             <div>
-              <label style={labelStyle}>Amount *</label>
+              <label style={labelStyle}>Invoice Amount *</label>
               <input
                 type="number"
                 name="amount"
-                placeholder="0.00"
+                placeholder="Total invoice value e.g. 50000.00"
                 value={formData.amount || ''}
                 onChange={handleChange}
                 required
@@ -143,6 +144,23 @@ export default function InvoiceCreatePage(): JSX.Element {
                 style={inputStyle}
                 disabled={loading}
               />
+            </div>
+            <div>
+              <label style={labelStyle}>Amount Unpaid</label>
+              <input
+                type="number"
+                name="amount_unpaid"
+                placeholder="Outstanding balance e.g. 25000.00"
+                value={formData.amount_unpaid ?? ''}
+                onChange={handleChange}
+                step="0.01"
+                min="0"
+                style={inputStyle}
+                disabled={loading}
+              />
+              <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '-10px', marginBottom: '10px' }}>
+                Leave blank if the full amount is unpaid.
+              </p>
             </div>
             <div>
               <label style={labelStyle}>Issue Date *</label>

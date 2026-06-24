@@ -5,6 +5,7 @@ export interface Invoice {
   company_id: number;
   invoice_number: string;
   amount: number;
+  amount_unpaid?: number;
   issue_date: string;
   due_date: string;
   status: 'pending' | 'paid' | 'overdue' | 'cancelled';
@@ -16,6 +17,7 @@ export interface Invoice {
 export interface InvoiceInput {
   invoice_number: string;
   amount: number;
+  amount_unpaid?: number;
   issue_date: string;
   due_date: string;
   status?: 'pending' | 'paid' | 'overdue' | 'cancelled';

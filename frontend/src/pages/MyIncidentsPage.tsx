@@ -126,7 +126,11 @@ const MyIncidentsPage: React.FC = () => {
     (inv) => inv.status === 'pending' || inv.status === 'overdue'
   );
 
-  const totalUnpaid = unpaidInvoices.reduce((sum, inv) => sum + Number(inv.amount), 0);
+  // Use amount_unpaid if set, otherwise fall back to full amount
+  const totalUnpaid = unpaidInvoices.reduce(
+    (sum, inv) => sum + Number(inv.amount_unpaid ?? inv.amount),
+    0
+  );
 
   return (
     <div className="space-y-6">
@@ -178,7 +182,12 @@ const MyIncidentsPage: React.FC = () => {
                         </Link>
                       </td>
                       <td className="py-2 px-3 font-medium text-gray-900">
-                        ₹{Number(inv.amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        ₹{Number(inv.amount_unpaid ?? inv.amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        {inv.amount_unpaid != null && (
+                          <span className="block text-xs text-gray-400 font-normal">
+                            of ₹{Number(inv.amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                          </span>
+                        )}
                       </td>
                       <td className="py-2 px-3 text-gray-600">
                         {new Date(inv.due_date).toLocaleDateString('en-IN')}
