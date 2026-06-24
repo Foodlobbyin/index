@@ -12,6 +12,8 @@ import moderationRoutes from './routes/moderation.routes';
 import reputationRoutes from './routes/reputation.routes';
 import auditLogRoutes from './routes/auditLog.routes';
 import adminRoutes from './routes/admin.routes';
+import inviteRoutes from './routes/invite.routes';
+import waitlistRoutes from './routes/waitlist.routes';
 import healthRoutes from './routes/health';
 import { apiLimiter } from './middleware/rateLimiter';
 
@@ -19,11 +21,6 @@ const app = new Hono<AppBindings>();
 
 // CORS for all routes.
 app.use('*', cors());
-
-// TODO(swagger): Swagger/OpenAPI docs are not yet wired up for the Workers
-// runtime. The previous Express setup used swagger-jsdoc + swagger-ui-express,
-// which are not Workers-compatible. Re-introduce via a Workers-friendly
-// approach (e.g. serving a pre-generated OpenAPI JSON) in a later phase.
 
 // Apply general rate limiting to all API routes.
 app.use('/api/*', apiLimiter);
@@ -36,7 +33,8 @@ app.get('/api/health', (c) => {
     service: 'Foodlobbyin API',
     features: {
       secureRegistration: true,
-      referralSystem: true,
+      inviteSystem: true,
+      waitlist: true,
       otpVerification: true,
       gstnValidation: true,
       incidentManagement: true,
@@ -46,9 +44,11 @@ app.get('/api/health', (c) => {
 
 // Routes
 app.route('/api/health', healthRoutes);
-app.route('/api/auth', authRoutes); // Legacy auth routes
-app.route('/api/secure-auth', secureAuthRoutes); // New secure auth routes with referral
-app.route('/api/referrals', referralRoutes); // Referral management routes
+app.route('/api/auth', authRoutes);               // Legacy auth routes
+app.route('/api/secure-auth', secureAuthRoutes);  // Secure auth with invite-based registration
+app.route('/api/referrals', referralRoutes);      // Legacy referral routes (kept for compat)
+app.route('/api/invite', inviteRoutes);           // Invite token management
+app.route('/api/waitlist', waitlistRoutes);       // Public waitlist signup
 app.route('/api/company', companyRoutes);
 app.route('/api/invoices', invoiceRoutes);
 app.route('/api/insights', insightsRoutes);
