@@ -144,6 +144,7 @@ const ReportIncidentPage: React.FC = () => {
         incident_type: formData.incident_type,
         incident_date: new Date().toISOString().split('T')[0], // auto-set to today
         incident_title: `${formData.incident_type} - ${formData.company_name}`, // auto-generated
+        description: '', // not collected from user — backend requires non-null
         invoice_amount: invoiceAmt,
         unpaid_amount: unpaidAmt,
         invoice_date: formData.invoice_date || undefined,
