@@ -28,17 +28,21 @@ const DashboardKPIs: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Single request — all three services share the same /insights/dashboard endpoint.
         const [statsData, monthData, statusData] = await Promise.all([
           insightsService.getDashboardStats(),
           insightsService.getInvoicesByMonth(),
           insightsService.getInvoicesByStatus(),
         ]);
-        
         setStats(statsData);
         setInvoicesByMonth(monthData);
         setInvoicesByStatus(statusData);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        // Show zeros on error — no fake numbers
+        setStats({ totalCompanies: 0, totalInvoices: 0, unpaidInvoices: 0, totalUsers: 0, resolvedIssues: 0 });
+        setInvoicesByMonth([]);
+        setInvoicesByStatus([]);
       } finally {
         setLoading(false);
       }

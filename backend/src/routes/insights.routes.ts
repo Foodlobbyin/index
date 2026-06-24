@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { AppBindings } from '../types/env';
 import invoiceController from '../controllers/invoice.controller';
+import { createDbClient } from '../config/database';
 
 const router = new Hono<AppBindings>();
 
@@ -70,5 +71,58 @@ const router = new Hono<AppBindings>();
  *               $ref: '#/components/schemas/Error'
  */
 router.get('/', invoiceController.getMarketInsights);
+
+/**
+ * GET /api/insights/dashboard
+ * Real-time dashboard KPI stats from the database.
+ */
+router.get('/dashboard', async (c) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+  try {
+    const [companies, invoices, incidents, monthlyInvoices, statusBreakdown] = await Promise.all([
+      db.query(`SELECT COUNT(*)::int AS total FROM company_profiles cp JOIN users u ON u.id = cp.user_id WHERE u.registration_status = 'active'`),
+      db.query(`
+        SELECT
+          COUNT(*)::int                                                              AS total_invoices,
+          COUNT(*) FILTER (WHERE status != 'paid')::int                             AS unpaid_invoices
+        FROM invoices
+      `),
+      db.query(`SELECT COUNT(*) FILTER (WHERE status = 'resolved')::int AS resolved_issues FROM incidents`),
+      db.query(`
+        SELECT
+          TO_CHAR(created_at, 'Mon') AS month,
+          EXTRACT(MONTH FROM created_at)::int AS month_num,
+          EXTRACT(YEAR FROM created_at)::int AS year,
+          COUNT(*) FILTER (WHERE status = 'paid')::int   AS paid,
+          COUNT(*) FILTER (WHERE status != 'paid')::int  AS unpaid
+        FROM invoices
+        WHERE created_at >= NOW() - INTERVAL '6 months'
+        GROUP BY month, month_num, year
+        ORDER BY year, month_num
+      `),
+      db.query(`
+        SELECT
+          INITCAP(status) AS status,
+          COUNT(*)::int   AS count,
+          COALESCE(SUM(amount), 0)::float AS value
+        FROM invoices
+        GROUP BY status
+        ORDER BY count DESC
+      `),
+    ]);
+
+    return c.json({
+      totalCompanies:  companies.rows[0]?.total ?? 0,
+      totalInvoices:   invoices.rows[0]?.total_invoices ?? 0,
+      unpaidInvoices:  invoices.rows[0]?.unpaid_invoices ?? 0,
+      resolvedIssues:  incidents.rows[0]?.resolved_issues ?? 0,
+      invoicesByMonth: monthlyInvoices.rows,
+      invoicesByStatus: statusBreakdown.rows,
+    });
+  } catch (err: any) {
+    console.error('Dashboard stats error:', err);
+    return c.json({ error: 'Failed to load dashboard stats.' }, 500);
+  }
+});
 
 export default router;

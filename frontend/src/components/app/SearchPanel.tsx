@@ -54,7 +54,9 @@ const SearchPanel: React.FC = () => {
   };
 
   const handleRowClick = (result: SearchResult) => {
-    navigate(`/company/view/${result.company_id}`);
+    // Use window.location.href to ensure clean navigation out of the
+    // AppShell nested <Routes> context into the top-level route.
+    window.location.href = `/company/view/${result.company_id}`;
   };
 
   const getRepBadge = (score: number | null) => {
