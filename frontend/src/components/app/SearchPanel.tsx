@@ -1,28 +1,34 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
 import LoadingSpinner from '../ui/LoadingSpinner';
+import api from '../../services/api';
 
 interface SearchResult {
-  id: string;
-  name: string;
-  gstin: string;
-  phone: string;
-  invoiceCount: number;
-  unpaidAmount: number;
-  lastActivity: string;
-  status: 'verified' | 'pending' | 'flagged';
+  company_id: number;
+  company_name: string;
+  gstn: string;
+  phone_number: string | null;
+  industry: string | null;
+  city: string | null;
+  country: string | null;
+  reputation_score: number | null;
+  invoice_count: number;
+  unpaid_amount: number;
 }
 
 const SearchPanel: React.FC = () => {
+  const navigate = useNavigate();
   const [searchType, setSearchType] = useState<'gstin' | 'phone'>('gstin');
   const [searchValue, setSearchValue] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,62 +36,32 @@ const SearchPanel: React.FC = () => {
 
     setLoading(true);
     setSearched(true);
+    setError(null);
+    setResults([]);
 
-    // Simulate API call
-    setTimeout(() => {
-      // Mock results
-      const mockResults: SearchResult[] = searchType === 'gstin'
-        ? [
-            {
-              id: '1',
-              name: 'Spice Traders Pvt Ltd',
-              gstin: '27AABCT1234L1Z5',
-              phone: '+91 9876543210',
-              invoiceCount: 45,
-              unpaidAmount: 125000,
-              lastActivity: '2024-02-10',
-              status: 'verified',
-            },
-            {
-              id: '2',
-              name: 'Kerala Spice Exporters',
-              gstin: '32AABCK5555M1Z8',
-              phone: '+91 9988776655',
-              invoiceCount: 67,
-              unpaidAmount: 0,
-              lastActivity: '2024-02-15',
-              status: 'verified',
-            },
-          ]
-        : [
-            {
-              id: '3',
-              name: 'Mumbai Food Supplies',
-              gstin: '27AABCM9999N1Z3',
-              phone: searchValue,
-              invoiceCount: 23,
-              unpaidAmount: 45000,
-              lastActivity: '2024-02-12',
-              status: 'verified',
-            },
-          ];
-      
-      setResults(mockResults);
+    try {
+      const params = searchType === 'gstin'
+        ? { gstn: searchValue.trim().toUpperCase() }
+        : { phone: searchValue.trim() };
+
+      const response = await api.get('/company/search', { params });
+      setResults(response.data.results || []);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Search failed. Please try again.');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'verified':
-        return <Badge variant="success">Verified</Badge>;
-      case 'pending':
-        return <Badge variant="warning">Pending</Badge>;
-      case 'flagged':
-        return <Badge variant="danger">Flagged</Badge>;
-      default:
-        return <Badge>Unknown</Badge>;
-    }
+  const handleRowClick = (result: SearchResult) => {
+    navigate(`/company/view/${result.company_id}`);
+  };
+
+  const getRepBadge = (score: number | null) => {
+    if (score === null || score === undefined) return <Badge>No data</Badge>;
+    if (score >= 80) return <Badge variant="success">Good ({score})</Badge>;
+    if (score >= 50) return <Badge variant="warning">Fair ({score})</Badge>;
+    return <Badge variant="danger">Poor ({score})</Badge>;
   };
 
   return (
@@ -104,7 +80,7 @@ const SearchPanel: React.FC = () => {
                 ? 'border-b-2 border-blue-600 text-blue-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
-            onClick={() => setSearchType('gstin')}
+            onClick={() => { setSearchType('gstin'); setSearched(false); setResults([]); }}
           >
             Search by GSTIN
           </button>
@@ -114,7 +90,7 @@ const SearchPanel: React.FC = () => {
                 ? 'border-b-2 border-blue-600 text-blue-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
-            onClick={() => setSearchType('phone')}
+            onClick={() => { setSearchType('phone'); setSearched(false); setResults([]); }}
           >
             Search by Phone
           </button>
@@ -124,7 +100,7 @@ const SearchPanel: React.FC = () => {
         <form onSubmit={handleSearch} className="flex gap-3">
           <Input
             type="text"
-            placeholder={searchType === 'gstin' ? 'Enter 15-digit GSTIN' : 'Enter phone number'}
+            placeholder={searchType === 'gstin' ? 'Enter 15-digit GSTIN (e.g. 24AABCX1234A1Z5)' : 'Enter phone number'}
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             fullWidth
@@ -136,23 +112,33 @@ const SearchPanel: React.FC = () => {
           </Button>
         </form>
 
-        {/* Results */}
+        {/* Error */}
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Loading */}
         {loading && (
           <div className="flex justify-center py-8">
             <LoadingSpinner size="md" />
           </div>
         )}
 
-        {!loading && searched && results.length === 0 && (
+        {/* No results */}
+        {!loading && searched && results.length === 0 && !error && (
           <div className="text-center py-8 text-gray-500">
             <p className="text-lg font-medium mb-2">No results found</p>
             <p className="text-sm">Try searching with a different GSTIN or phone number</p>
           </div>
         )}
 
+        {/* Results */}
         {!loading && results.length > 0 && (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Results ({results.length})</h3>
+            <p className="text-xs text-gray-400">Click a row to view the company profile</p>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -170,42 +156,54 @@ const SearchPanel: React.FC = () => {
                       Invoices
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Unpaid Amount
+                      Unpaid
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                      Reputation
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {results.map((result) => (
-                    <tr key={result.id} className="hover:bg-gray-50">
+                    <tr
+                      key={result.company_id}
+                      onClick={() => handleRowClick(result)}
+                      className="hover:bg-blue-50 cursor-pointer transition-colors"
+                      title="Click to view company profile"
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{result.name}</div>
-                        <div className="text-sm text-gray-500">
-                          Last activity: {new Date(result.lastActivity).toLocaleDateString()}
+                        <div className="text-sm font-medium text-blue-700 hover:underline">
+                          {result.company_name}
                         </div>
+                        {(result.city || result.country) && (
+                          <div className="text-xs text-gray-400">
+                            {[result.city, result.country].filter(Boolean).join(', ')}
+                          </div>
+                        )}
+                        {result.industry && (
+                          <div className="text-xs text-gray-400">{result.industry}</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">
+                        {result.gstn || '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {result.gstin}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {result.phone}
+                        {result.phone_number || '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {result.invoiceCount}
+                        {result.invoice_count}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {result.unpaidAmount > 0 ? (
+                        {result.unpaid_amount > 0 ? (
                           <span className="text-red-600 font-medium">
-                            ₹{result.unpaidAmount.toLocaleString()}
+                            ₹{Number(result.unpaid_amount).toLocaleString('en-IN')}
                           </span>
                         ) : (
                           <span className="text-green-600">All Paid</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(result.status)}
+                        {getRepBadge(result.reputation_score)}
                       </td>
                     </tr>
                   ))}
