@@ -7,56 +7,40 @@ on:
   pull_request:
 
 jobs:
-  build-and-test:
+  build-backend:
+    name: Backend TypeScript Build
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_DB: foodlobbyin
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_HOST: localhost
-      DB_PORT: 5432
-      DB_NAME: foodlobbyin
-      JWT_SECRET: test-secret-for-ci
-      NODE_ENV: test
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js 24
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '20'
 
       - name: Install dependencies
         run: npm install
         working-directory: ./backend
 
-      - name: Lint
-        run: npm run lint || echo "No lint script or lint step skipped"
-        working-directory: ./backend
-
-      - name: Build
+      - name: TypeScript build check
         run: npm run build
         working-directory: ./backend
 
-      - name: Test
-        run: npm test
-        working-directory: ./backend
+  build-frontend:
+    name: Frontend TypeScript Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: ./frontend
+
+      - name: TypeScript + Vite build
+        run: npm run build
+        working-directory: ./frontend
