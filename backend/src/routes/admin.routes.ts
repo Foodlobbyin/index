@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import bcrypt from 'bcryptjs';
 import type { AppBindings } from '../types/env';
 import { createDbClient } from '../config/database';
 import { authenticate, requireMinTrustLevel } from '../middleware/auth.middleware';
@@ -255,6 +256,72 @@ router.delete('/invites/:id/revoke', async (c) => {
   const id = parseInt(c.req.param('id'));
   await inviteTokenRepository.revoke(db, id);
   return c.json({ message: 'Invite revoked.' });
+});
+
+/**
+ * PATCH /api/admin/profile
+ * Update admin username and email
+ */
+router.patch('/profile', async (c) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+  const user = c.get('user');
+  const { username, email } = await c.req.json();
+
+  if (!username || username.length < 3 || username.length > 50) {
+    return c.json({ error: 'Username must be 3–50 characters.' }, 400);
+  }
+  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    return c.json({ error: 'Username may only contain letters, numbers, and underscores.' }, 400);
+  }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return c.json({ error: 'Valid email is required.' }, 400);
+  }
+
+  // Check uniqueness against other users
+  const [dupU, dupE] = await Promise.all([
+    db.query('SELECT id FROM users WHERE username = $1 AND id != $2', [username, user.id]),
+    db.query('SELECT id FROM users WHERE email = $1 AND id != $2', [email, user.id]),
+  ]);
+  if (dupU.rows.length > 0) return c.json({ error: 'Username already taken.' }, 409);
+  if (dupE.rows.length > 0) return c.json({ error: 'Email already in use.' }, 409);
+
+  await db.query(
+    'UPDATE users SET username = $1, email = $2 WHERE id = $3',
+    [username, email, user.id]
+  );
+  return c.json({ message: 'Profile updated successfully.' });
+});
+
+/**
+ * PATCH /api/admin/profile/password
+ * Change admin password (requires current password verification)
+ */
+router.patch('/profile/password', async (c) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+  const user = c.get('user');
+  const { current_password, new_password } = await c.req.json();
+
+  if (!current_password || !new_password) {
+    return c.json({ error: 'Current and new password are required.' }, 400);
+  }
+  if (new_password.length < 10) {
+    return c.json({ error: 'Password must be at least 10 characters.' }, 400);
+  }
+  if (!/[A-Z]/.test(new_password) || !/[0-9]/.test(new_password) || !/[^a-zA-Z0-9]/.test(new_password)) {
+    return c.json({ error: 'Password needs 1 uppercase, 1 number, 1 special character.' }, 400);
+  }
+
+  const row = await db.query('SELECT password_hash FROM users WHERE id = $1', [user.id]);
+  if (!row.rows[0]?.password_hash) {
+    return c.json({ error: 'No password set on this account.' }, 400);
+  }
+
+  const valid = await bcrypt.compare(current_password, row.rows[0].password_hash);
+  if (!valid) return c.json({ error: 'Current password is incorrect.' }, 401);
+
+  const new_hash = await bcrypt.hash(new_password, 12);
+  await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [new_hash, user.id]);
+  return c.json({ message: 'Password changed successfully.' });
 });
 
 export default router;
