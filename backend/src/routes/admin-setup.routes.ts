@@ -1,6 +1,6 @@
 /**
  * Admin Setup Route — ONE TIME USE ONLY
- * POST /api/admin/setup
+ * POST /api/setup/admin
  *
  * Allows the owner to register their private admin credentials
  * on first launch. Once an admin with a password exists, this
@@ -16,7 +16,7 @@ import { createDbClient } from '../config/database';
 
 const router = new Hono<AppBindings>();
 
-router.post('/setup', async (c) => {
+router.post('/admin', async (c) => {
   const db = createDbClient(c.env.DATABASE_URL);
 
   try {
