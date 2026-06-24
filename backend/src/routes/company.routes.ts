@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { AppBindings } from '../types/env';
 import companyController from '../controllers/company.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
-import { createLimiter } from '../middleware/rateLimiter';
+import { createDbClient } from '../config/database';
 
 const router = new Hono<AppBindings>();
 
@@ -10,247 +10,127 @@ const router = new Hono<AppBindings>();
 router.use(authMiddleware);
 
 /**
- * @openapi
- * /api/company:
- *   post:
- *     tags:
- *       - Company
- *     summary: Create company profile
- *     description: Create a new company profile for the authenticated user
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *               - industry
- *             properties:
- *               name:
- *                 type: string
- *                 example: Acme Corporation
- *               industry:
- *                 type: string
- *                 example: Technology
- *               revenue:
- *                 type: number
- *                 format: decimal
- *                 example: 5000000.00
- *               employees:
- *                 type: integer
- *                 example: 50
- *               address:
- *                 type: string
- *                 example: 123 Main Street
- *               city:
- *                 type: string
- *                 example: San Francisco
- *               country:
- *                 type: string
- *                 example: USA
- *               website:
- *                 type: string
- *                 format: uri
- *                 example: https://acme.com
- *     responses:
- *       201:
- *         description: Company created successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Company'
- *       400:
- *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       409:
- *         description: Company already exists for this user
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       429:
- *         description: Too many create requests
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ * GET /api/company/search
+ * Search companies by GSTN (exact) or phone number (partial match)
+ * Returns company_profiles joined with users for GSTN/phone data
  */
-router.post('/', /* createLimiter */ companyController.createCompany);
+router.get('/search', async (c) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+  const gstn = c.req.query('gstn');
+  const phone = c.req.query('phone');
+
+  if (!gstn && !phone) {
+    return c.json({ error: 'Provide gstn or phone query parameter.' }, 400);
+  }
+
+  let rows;
+
+  if (gstn) {
+    // Exact GSTN match on users table, join company_profiles
+    const result = await db.query(
+      `SELECT
+         cp.id            AS company_id,
+         cp.company_name,
+         cp.industry,
+         cp.city,
+         cp.country,
+         cp.reputation_score,
+         u.gstn,
+         u.phone_number,
+         COUNT(DISTINCT inv.id)::int                                  AS invoice_count,
+         COALESCE(SUM(CASE WHEN inv.status != 'paid' THEN inv.amount ELSE 0 END), 0) AS unpaid_amount
+       FROM users u
+       JOIN company_profiles cp ON cp.user_id = u.id
+       LEFT JOIN invoices inv ON inv.company_id = cp.id
+       WHERE u.gstn = $1
+         AND u.registration_status = 'active'
+       GROUP BY cp.id, cp.company_name, cp.industry, cp.city, cp.country, cp.reputation_score, u.gstn, u.phone_number
+       ORDER BY cp.company_name`,
+      [gstn.toUpperCase()]
+    );
+    rows = result.rows;
+  } else {
+    // Partial phone match — strip non-digits for flexible matching
+    const clean = (phone as string).replace(/\D/g, '');
+    const result = await db.query(
+      `SELECT
+         cp.id            AS company_id,
+         cp.company_name,
+         cp.industry,
+         cp.city,
+         cp.country,
+         cp.reputation_score,
+         u.gstn,
+         u.phone_number,
+         COUNT(DISTINCT inv.id)::int                                  AS invoice_count,
+         COALESCE(SUM(CASE WHEN inv.status != 'paid' THEN inv.amount ELSE 0 END), 0) AS unpaid_amount
+       FROM users u
+       JOIN company_profiles cp ON cp.user_id = u.id
+       LEFT JOIN invoices inv ON inv.company_id = cp.id
+       WHERE REGEXP_REPLACE(COALESCE(u.phone_number, ''), '[^0-9]', '', 'g') LIKE $1
+         AND u.registration_status = 'active'
+       GROUP BY cp.id, cp.company_name, cp.industry, cp.city, cp.country, cp.reputation_score, u.gstn, u.phone_number
+       ORDER BY cp.company_name
+       LIMIT 20`,
+      [`%${clean}%`]
+    );
+    rows = result.rows;
+  }
+
+  return c.json({ results: rows });
+});
 
 /**
- * @openapi
- * /api/company:
- *   get:
- *     tags:
- *       - Company
- *     summary: Get user's company profile
- *     description: Retrieve the company profile for the authenticated user
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Company profile retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Company'
- *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       404:
- *         description: Company profile not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ * GET /api/company/view/:id
+ * Public company view by company_profiles.id (for search result navigation)
+ */
+router.get('/view/:id', async (c) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+  const id = parseInt(c.req.param('id'));
+  if (isNaN(id)) return c.json({ error: 'Invalid company id.' }, 400);
+
+  const result = await db.query(
+    `SELECT
+       cp.*,
+       u.gstn,
+       u.phone_number,
+       u.first_name,
+       u.last_name,
+       u.registration_status,
+       COUNT(DISTINCT inv.id)::int AS invoice_count,
+       COALESCE(SUM(CASE WHEN inv.status != 'paid' THEN inv.amount ELSE 0 END), 0) AS unpaid_amount,
+       COALESCE(SUM(inv.amount), 0) AS total_invoice_amount
+     FROM company_profiles cp
+     JOIN users u ON u.id = cp.user_id
+     LEFT JOIN invoices inv ON inv.company_id = cp.id
+     WHERE cp.id = $1
+       AND u.registration_status = 'active'
+     GROUP BY cp.id, u.gstn, u.phone_number, u.first_name, u.last_name, u.registration_status`,
+    [id]
+  );
+
+  if (!result.rows[0]) return c.json({ error: 'Company not found.' }, 404);
+  return c.json({ company: result.rows[0] });
+});
+
+/**
+ * POST /api/company
+ */
+router.post('/', companyController.createCompany);
+
+/**
+ * GET /api/company
+ * Get own company profile
  */
 router.get('/', companyController.getCompany);
 
 /**
- * @openapi
- * /api/company/{id}:
- *   put:
- *     tags:
- *       - Company
- *     summary: Update company profile
- *     description: Update an existing company profile
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Company ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *                 example: Acme Corporation
- *               industry:
- *                 type: string
- *                 example: Technology
- *               revenue:
- *                 type: number
- *                 format: decimal
- *                 example: 6000000.00
- *               employees:
- *                 type: integer
- *                 example: 60
- *               address:
- *                 type: string
- *                 example: 456 Market Street
- *               city:
- *                 type: string
- *                 example: San Francisco
- *               country:
- *                 type: string
- *                 example: USA
- *               website:
- *                 type: string
- *                 format: uri
- *                 example: https://acme.com
- *     responses:
- *       200:
- *         description: Company updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Company'
- *       400:
- *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       403:
- *         description: Not authorized to update this company
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       404:
- *         description: Company not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ * PUT /api/company/:id
  */
 router.put('/:id', companyController.updateCompany);
 
 /**
- * @openapi
- * /api/company/{id}:
- *   delete:
- *     tags:
- *       - Company
- *     summary: Delete company profile
- *     description: Delete a company profile (requires ownership)
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Company ID
- *     responses:
- *       200:
- *         description: Company deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Company deleted successfully
- *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       403:
- *         description: Not authorized to delete this company
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       404:
- *         description: Company not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ * DELETE /api/company/:id
  */
 router.delete('/:id', companyController.deleteCompany);
 
