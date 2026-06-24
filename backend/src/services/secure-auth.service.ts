@@ -6,6 +6,7 @@
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import type { DbClient } from '../config/database';
+import type { Env } from '../types/env';
 import userRepository from '../repositories/user.repository';
 import referralRepository from '../repositories/referral.repository';
 import attemptRepository from '../repositories/attempt.repository';
@@ -37,6 +38,7 @@ export class SecureAuthService {
     ip_address: string,
     recaptchaSecretKey: string,
     nodeEnv: string,
+    env: Env,
     user_agent?: string,
     captcha_token?: string
   ): Promise<{ message: string; requiresOTP: boolean }> {
@@ -162,7 +164,7 @@ export class SecureAuthService {
 
       // 8. Generate and send OTP for email verification
       try {
-        await otpService.generateAndSendOTP(db, userData.email, ip_address);
+        await otpService.generateAndSendOTP(db, env, userData.email, ip_address);
       } catch (error: any) {
         console.error('Failed to send OTP:', error);
         // Don't fail registration if OTP sending fails
@@ -330,6 +332,7 @@ export class SecureAuthService {
     email: string,
     recaptchaSecretKey: string,
     nodeEnv: string,
+    env: Env,
     ip_address?: string,
     captcha_token?: string
   ): Promise<{ message: string }> {
@@ -341,7 +344,7 @@ export class SecureAuthService {
       }
     }
 
-    return await otpService.generateAndSendOTP(db, email, ip_address);
+    return await otpService.generateAndSendOTP(db, env, email, ip_address);
   }
 
   /**

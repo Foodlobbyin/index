@@ -27,7 +27,8 @@ export class AuthController {
           first_name,
           last_name,
         },
-        c.env.JWT_SECRET
+        c.env.JWT_SECRET,
+        c.env
       );
 
       try {
@@ -122,7 +123,7 @@ export class AuthController {
         return c.json({ error: 'Email is required' }, 400);
       }
 
-      const result = await authService.requestPasswordReset(db, email);
+      const result = await authService.requestPasswordReset(db, email, c.env);
 
       try {
         await auditLogService.writeLog(db, {
@@ -179,7 +180,7 @@ export class AuthController {
         return c.json({ error: 'Email is required' }, 400);
       }
 
-      const result = await authService.requestEmailOTP(db, email);
+      const result = await authService.requestEmailOTP(db, email, c.env);
       return c.json(result, 200);
     } catch (error: any) {
       return c.json({ error: error.message }, 400);

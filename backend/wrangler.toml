@@ -10,6 +10,8 @@ NODE_ENV = "production"
 # DATABASE_URL
 # JWT_SECRET
 # EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASSWORD, EMAIL_FROM (Phase 2)
+# EMAIL_FROM
+# RESEND_API_KEY — HTTP email via Resend (https://resend.com)
 # RECAPTCHA_SECRET_KEY
 # FRONTEND_URL
 # MAX_OTP_GENERATION_PER_HOUR
@@ -21,3 +23,7 @@ NODE_ENV = "production"
 binding = "RATE_LIMIT_KV"
 id = "c8bafedbc0db4644a133ab0feeb22d29"
 preview_id = "c7f1edb81ada49738faf8bf6ad171fa4"
+
+[[r2_buckets]]
+binding = "EVIDENCE_BUCKET"
+bucket_name = "foodlobbyin-evidence"

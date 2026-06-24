@@ -80,6 +80,7 @@ export class SecureAuthController {
         ip_address,
         c.env.RECAPTCHA_SECRET_KEY,
         c.env.NODE_ENV,
+        c.env,
         user_agent,
         captcha_token
       );
@@ -168,6 +169,7 @@ export class SecureAuthController {
         email,
         c.env.RECAPTCHA_SECRET_KEY,
         c.env.NODE_ENV,
+        c.env,
         ip_address,
         captcha_token
       );

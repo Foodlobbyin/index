@@ -12,7 +12,10 @@ export type Env = {
   OTP_EXPIRY_MINUTES: string;
   RATE_LIMIT_MAX: string;
   NODE_ENV: string;
+  EMAIL_FROM: string;
+  RESEND_API_KEY: string;
   RATE_LIMIT_KV: KVNamespace;
+  EVIDENCE_BUCKET: R2Bucket;
 };
 
 /**
@@ -25,6 +28,7 @@ export type Variables = {
     trust_level?: string;
   };
   validatedBody: unknown;
+  uploadedFiles: import('../middleware/upload.middleware').ParsedFile[];
 };
 
 /**

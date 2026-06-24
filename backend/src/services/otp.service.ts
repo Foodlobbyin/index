@@ -4,9 +4,12 @@
  */
 
 import type { DbClient } from '../config/database';
+import type { Env } from '../types/env';
 import userRepository from '../repositories/user.repository';
 import attemptRepository from '../repositories/attempt.repository';
 import emailService from './email.service';
+
+const DEFAULT_FROM_EMAIL = 'noreply@foodlobbyin.com';
 
 const DEFAULT_OTP_EXPIRY_MINUTES = 10;
 const DEFAULT_MAX_OTP_GENERATION_PER_HOUR = 5;
@@ -85,6 +88,7 @@ export class OTPService {
    */
   async generateAndSendOTP(
     db: DbClient,
+    env: Env,
     email: string,
     ip_address?: string,
     otpExpiryMinutes: number = DEFAULT_OTP_EXPIRY_MINUTES,
@@ -121,7 +125,12 @@ export class OTPService {
 
     // Send OTP email
     try {
-      await emailService.sendOTPEmail(email, otp);
+      await emailService.sendOTPEmail(
+        env.RESEND_API_KEY,
+        env.EMAIL_FROM || DEFAULT_FROM_EMAIL,
+        email,
+        otp
+      );
 
       // Log successful attempt
       if (ip_address) {
@@ -188,12 +197,13 @@ export class OTPService {
    */
   async resendOTP(
     db: DbClient,
+    env: Env,
     email: string,
     ip_address?: string,
     otpExpiryMinutes: number = DEFAULT_OTP_EXPIRY_MINUTES,
     maxOtpGenerationPerHour: number = DEFAULT_MAX_OTP_GENERATION_PER_HOUR
   ): Promise<{ message: string }> {
-    return await this.generateAndSendOTP(db, email, ip_address, otpExpiryMinutes, maxOtpGenerationPerHour);
+    return await this.generateAndSendOTP(db, env, email, ip_address, otpExpiryMinutes, maxOtpGenerationPerHour);
   }
 }
 

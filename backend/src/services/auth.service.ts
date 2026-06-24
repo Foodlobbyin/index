@@ -25,9 +25,12 @@
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import type { DbClient } from '../config/database';
+import type { Env } from '../types/env';
 import userRepository from '../repositories/user.repository';
 import emailService from './email.service';
 import { UserCreateInputLegacy, UserLoginInput, EmailOTPLoginInput, UserResponse } from '../models/User';
+
+const DEFAULT_FROM_EMAIL = 'noreply@foodlobbyin.com';
 
 const SALT_ROUNDS = 10;
 
@@ -54,7 +57,7 @@ export class AuthService {
       .sign(secret);
   }
 
-  async register(db: DbClient, userData: UserCreateInputLegacy, jwtSecret: string): Promise<{ user: UserResponse; token: string; message: string }> {
+  async register(db: DbClient, userData: UserCreateInputLegacy, jwtSecret: string, env: Env): Promise<{ user: UserResponse; token: string; message: string }> {
     // Check if user already exists
     const existingUser = await userRepository.findByUsername(db, userData.username);
     if (existingUser) {
@@ -98,7 +101,13 @@ export class AuthService {
 
     // Send verification email
     try {
-      await emailService.sendVerificationEmail(userData.email, verificationToken);
+      await emailService.sendVerificationEmail(
+        env.RESEND_API_KEY,
+        env.EMAIL_FROM || DEFAULT_FROM_EMAIL,
+        env.FRONTEND_URL,
+        userData.email,
+        verificationToken
+      );
     } catch (error) {
       console.error('Failed to send verification email:', error);
       // Don't fail registration if email fails
@@ -150,7 +159,7 @@ export class AuthService {
     return { message: 'Email verified successfully!' };
   }
 
-  async requestPasswordReset(db: DbClient, email: string): Promise<{ message: string }> {
+  async requestPasswordReset(db: DbClient, email: string, env: Env): Promise<{ message: string }> {
     const user = await userRepository.findByEmail(db, email);
     if (!user) {
       // Don't reveal if email exists or not for security
@@ -166,7 +175,13 @@ export class AuthService {
 
     // Send reset email
     try {
-      await emailService.sendPasswordResetEmail(email, resetToken);
+      await emailService.sendPasswordResetEmail(
+        env.RESEND_API_KEY,
+        env.EMAIL_FROM || DEFAULT_FROM_EMAIL,
+        env.FRONTEND_URL,
+        email,
+        resetToken
+      );
     } catch (error) {
       console.error('Failed to send password reset email:', error);
       throw new Error('Failed to send password reset email');
@@ -187,7 +202,7 @@ export class AuthService {
     return { message: 'Password reset successfully! You can now login with your new password.' };
   }
 
-  async requestEmailOTP(db: DbClient, email: string): Promise<{ message: string }> {
+  async requestEmailOTP(db: DbClient, email: string, env: Env): Promise<{ message: string }> {
     const user = await userRepository.findByEmail(db, email);
     if (!user) {
       // Don't reveal if email exists or not for security
@@ -203,7 +218,12 @@ export class AuthService {
 
     // Send OTP email
     try {
-      await emailService.sendOTPEmail(email, otp);
+      await emailService.sendOTPEmail(
+        env.RESEND_API_KEY,
+        env.EMAIL_FROM || DEFAULT_FROM_EMAIL,
+        email,
+        otp
+      );
     } catch (error) {
       console.error('Failed to send OTP email:', error);
       throw new Error('Failed to send OTP email');
