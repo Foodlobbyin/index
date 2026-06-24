@@ -69,7 +69,7 @@ const IncidentDetailPage: React.FC = () => {
           company_gstn: data.company_gstn,
           company_name: data.company_name,
           incident_type: data.incident_type,
-          incident_date: data.incident_date.split('T')[0],
+          incident_date: data.incident_date ? data.incident_date.split('T')[0] : '',
           incident_title: data.incident_title,
           description: data.description,
           amount_involved: data.amount_involved,
@@ -253,7 +253,7 @@ const IncidentDetailPage: React.FC = () => {
           </div>
           <div>
             <dt className="font-medium text-gray-500">Incident Date</dt>
-            <dd className="text-gray-900 mt-1">{new Date(incident.incident_date).toLocaleDateString()}</dd>
+            <dd className="text-gray-900 mt-1">{incident.incident_date ? new Date(incident.incident_date).toLocaleDateString() : "—"}</dd>
           </div>
           <div>
             <dt className="font-medium text-gray-500">Amount Involved</dt>
