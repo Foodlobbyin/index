@@ -23,16 +23,51 @@ export default function AdminPanel(): JSX.Element {
   const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   useEffect(() => {
+    // Step 1: Fast check from localStorage so the panel doesn't flash a redirect
+    // on every load while the API call is in-flight.
+    const stored = localStorage.getItem('user');
+    if (stored) {
+      try {
+        const u = JSON.parse(stored);
+        if (u?.trust_level === 'admin') {
+          setAuthorized(true);
+          // Still refresh from server in the background to keep data current
+          api.get('/auth/profile').then(res => {
+            const fresh = res.data?.user ?? res.data;
+            if (fresh?.trust_level !== 'admin') {
+              setAuthorized(false);
+              navigate('/dashboard');
+            } else {
+              // Update localStorage with fresh data
+              localStorage.setItem('user', JSON.stringify(fresh));
+            }
+          }).catch(() => {
+            // Network / timeout — keep the localStorage-based grant
+          });
+          return;
+        }
+      } catch (_) { /* ignore malformed JSON */ }
+    }
+
+    // Step 2: No local state — must verify with server
     api.get('/auth/profile').then(res => {
-      if (res.data.user?.trust_level === 'admin') {
+      const u = res.data?.user ?? res.data;
+      if (u?.trust_level === 'admin') {
         setAuthorized(true);
       } else {
         setAuthorized(false);
         navigate('/dashboard');
       }
-    }).catch(() => {
-      setAuthorized(false);
-      navigate('/login');
+    }).catch((err) => {
+      // Only hard-redirect on definitive 401; keep trying on network errors
+      if (err?.response?.status === 401) {
+        setAuthorized(false);
+        navigate('/login');
+      } else {
+        // Server temporarily unreachable — deny access to be safe
+        setAuthorized(false);
+        navigate('/login');
+      }
     });
   }, []);
 
@@ -75,10 +110,24 @@ export default function AdminPanel(): JSX.Element {
             );
           })}
         </nav>
-        <div style={{ position: 'absolute', bottom: 20, padding: '0 20px' }}>
+        <div style={{ position: 'absolute', bottom: 20, padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <a href="/app" style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, textDecoration: 'none' }}>
             ← Back to App
           </a>
+          <button
+            onClick={() => {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              window.location.href = '/login';
+            }}
+            style={{
+              background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)',
+              color: 'rgba(255,255,255,0.85)', borderRadius: 6, padding: '6px 14px',
+              fontSize: 13, cursor: 'pointer', textAlign: 'left',
+            }}
+          >
+            🚪 Logout
+          </button>
         </div>
       </div>
 

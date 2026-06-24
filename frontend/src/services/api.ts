@@ -24,9 +24,20 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      // Only redirect to /login if we are NOT already on the login page
+      // and this is NOT a background auth-check or admin profile fetch.
+      // This prevents aggressive auto-logout from background requests.
+      const url: string = error.config?.url ?? '';
+      const isAuthCheck =
+        url.includes('/auth/profile') ||
+        url.includes('/auth/login') ||
+        url.includes('/auth/register');
+
+      if (!isAuthCheck && window.location.pathname !== '/login') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

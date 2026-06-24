@@ -29,11 +29,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const timeoutPromise = new Promise((_, reject) =>
               setTimeout(() => reject(new Error('Auth check timeout')), 5000)
             );
-            const profile = await Promise.race([authService.getProfile(), timeoutPromise]);
-            setUser(profile);
-          } catch (error) {
-            authService.logout();
-            setIsAuthenticated(false);
+            const profileResult = await Promise.race([authService.getProfile(), timeoutPromise]) as { user: any };
+            setUser(profileResult?.user ?? profileResult);
+          } catch (error: any) {
+            // Only invalidate the session on a definitive 401 from the server.
+            // Network errors, timeouts, or 5xx should NOT log the user out.
+            const status = error?.response?.status;
+            if (status === 401) {
+              authService.logout();
+              setIsAuthenticated(false);
+            } else {
+              // Keep the token — load user from localStorage as fallback
+              const stored = localStorage.getItem('user');
+              if (stored) {
+                try { setUser(JSON.parse(stored)); } catch (_) { /* ignore */ }
+              }
+            }
           }
         }
       } catch (error) {

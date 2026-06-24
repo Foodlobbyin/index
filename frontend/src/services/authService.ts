@@ -69,7 +69,12 @@ export const authService = {
 
   async getProfile(): Promise<{ user: User }> {
     const response = await api.get('/auth/profile');
-    return response.data;
+    // Normalise: API returns { user: {...} } — return consistent shape
+    const data = response.data;
+    const user: User = data?.user ?? data;
+    // Keep localStorage in sync with fresh server data
+    localStorage.setItem('user', JSON.stringify(user));
+    return { user };
   },
 
   logout() {
