@@ -1,9 +1,9 @@
-import pool from '../config/database';
+import type { DbClient } from '../config/database';
 import { AuditLog, AuditLogSearchParams, AuditLogSearchResult, WriteAuditLogInput } from '../models/AuditLog';
 
 class AuditLogRepository {
-  async writeLog(input: WriteAuditLogInput): Promise<void> {
-    await pool.query(
+  async writeLog(db: DbClient, input: WriteAuditLogInput): Promise<void> {
+    await db.query(
       `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [
@@ -17,7 +17,7 @@ class AuditLogRepository {
     );
   }
 
-  async search(params: AuditLogSearchParams): Promise<AuditLogSearchResult> {
+  async search(db: DbClient, params: AuditLogSearchParams): Promise<AuditLogSearchResult> {
     const page = params.page ?? 1;
     const limit = params.limit ?? 20;
 
@@ -70,7 +70,7 @@ class AuditLogRepository {
 
     values.push(limit, offset);
 
-    const result = await pool.query(query, values);
+    const result = await db.query(query, values);
 
     const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count, 10) : 0;
     const logs: AuditLog[] = result.rows.map((row: Record<string, unknown>): AuditLog => ({

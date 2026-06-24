@@ -1,9 +1,10 @@
-import { Router } from 'express';
+import { Hono } from 'hono';
+import type { AppBindings } from '../types/env';
 import invoiceController from '../controllers/invoice.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { createLimiter } from '../middleware/rateLimiter';
 
-const router = Router();
+const router = new Hono<AppBindings>();
 
 // All routes require authentication
 router.use(authMiddleware);
@@ -85,7 +86,7 @@ router.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/', /* createLimiter */ (req, res) => invoiceController.createInvoice(req, res));
+router.post('/', /* createLimiter */ invoiceController.createInvoice);
 
 /**
  * @openapi
@@ -131,7 +132,7 @@ router.post('/', /* createLimiter */ (req, res) => invoiceController.createInvoi
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/', (req, res) => invoiceController.getInvoices(req, res));
+router.get('/', invoiceController.getInvoices);
 
 /**
  * @openapi
@@ -176,7 +177,7 @@ router.get('/', (req, res) => invoiceController.getInvoices(req, res));
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/:id', (req, res) => invoiceController.getInvoiceById(req, res));
+router.get('/:id', invoiceController.getInvoiceById);
 
 /**
  * @openapi
@@ -256,7 +257,7 @@ router.get('/:id', (req, res) => invoiceController.getInvoiceById(req, res));
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.put('/:id', (req, res) => invoiceController.updateInvoice(req, res));
+router.put('/:id', invoiceController.updateInvoice);
 
 /**
  * @openapi
@@ -305,6 +306,6 @@ router.put('/:id', (req, res) => invoiceController.updateInvoice(req, res));
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.delete('/:id', (req, res) => invoiceController.deleteInvoice(req, res));
+router.delete('/:id', invoiceController.deleteInvoice);
 
 export default router;

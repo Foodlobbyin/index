@@ -1,39 +1,25 @@
-import { Response } from 'express';
-import { AuthRequest } from '../middleware/auth.middleware';
+import type { Context } from 'hono';
+import type { AppBindings } from '../types/env';
+import { createDbClient } from '../config/database';
 import incidentService from '../services/incident.service';
 import auditLogService from '../services/auditLog.service';
 import { IncidentCreateInput, IncidentUpdateInput, IncidentSearchParams } from '../models/Incident';
 
 export class IncidentController {
-  /**
-   * @openapi
-   * /api/incidents/submit:
-   *   post:
-   *     tags: [Incidents]
-   *     summary: Submit a new incident report
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             $ref: '#/components/schemas/IncidentCreateInput'
-   *     responses:
-   *       201:
-   *         description: Incident created
-   *       400:
-   *         description: Validation error
-   */
-  async submit(req: AuthRequest, res: Response): Promise<void> {
+  async submit(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
+      const user = c.get('user');
+      const body = await c.req.json();
       const data: IncidentCreateInput = {
-        ...req.body,
-        reporter_id: req.user?.id,
+        ...body,
+        reporter_id: user?.id,
       };
-      const incident = await incidentService.createIncident(data);
+      const incident = await incidentService.createIncident(db, data);
 
       try {
-        await auditLogService.writeLog({
-          user_id: req.user?.id,
+        await auditLogService.writeLog(db, {
+          user_id: user?.id,
           action: 'incident_reported',
           entity_type: 'incident',
           entity_id: incident.id,
@@ -42,283 +28,154 @@ export class IncidentController {
             company_gstn: incident.company_gstn,
             is_anonymous: incident.is_anonymous,
           },
-          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+          ip_address:
+            c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown',
         });
       } catch { /* audit log failure must not break the main action */ }
 
-      res.status(201).json({ message: 'Incident submitted successfully', incident });
+      return c.json({ message: 'Incident submitted successfully', incident }, 201);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
-  /**
-   * @openapi
-   * /api/incidents/search:
-   *   get:
-   *     tags: [Incidents]
-   *     summary: Search incidents by company GSTN or name
-   *     parameters:
-   *       - in: query
-   *         name: gstn
-   *         schema:
-   *           type: string
-   *       - in: query
-   *         name: company_name
-   *         schema:
-   *           type: string
-   *       - in: query
-   *         name: incident_type
-   *         schema:
-   *           type: string
-   *       - in: query
-   *         name: page
-   *         schema:
-   *           type: integer
-   *       - in: query
-   *         name: limit
-   *         schema:
-   *           type: integer
-   *     responses:
-   *       200:
-   *         description: Search results
-   *       429:
-   *         description: Rate limit exceeded
-   */
-  async search(req: AuthRequest, res: Response): Promise<void> {
+  async search(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      const userId = req.user?.id;
+      const userId = c.get('user')?.id;
 
       if (userId) {
-        await incidentService.checkSearchRateLimit(userId);
+        await incidentService.checkSearchRateLimit(db, userId);
       }
 
+      const page = c.req.query('page');
+      const limit = c.req.query('limit');
       const params: IncidentSearchParams = {
-        gstn: req.query.gstn as string,
-        company_name: req.query.company_name as string,
-        incident_type: req.query.incident_type as any,
-        page: req.query.page ? parseInt(req.query.page as string, 10) : 1,
-        limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 20,
+        gstn: c.req.query('gstn') as string,
+        company_name: c.req.query('company_name') as string,
+        incident_type: c.req.query('incident_type') as any,
+        page: page ? parseInt(page, 10) : 1,
+        limit: limit ? parseInt(limit, 10) : 20,
       };
 
-      const result = await incidentService.searchIncidents(params, userId);
-      res.json(result);
+      const result = await incidentService.searchIncidents(db, params, userId);
+      return c.json(result);
     } catch (error: any) {
       if (error.message.includes('Daily search limit')) {
-        res.status(429).json({ error: error.message });
-        return;
+        return c.json({ error: error.message }, 429);
       }
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
-  /**
-   * @openapi
-   * /api/incidents/my-reports:
-   *   get:
-   *     tags: [Incidents]
-   *     summary: Get authenticated user's submitted incidents
-   *     security:
-   *       - bearerAuth: []
-   *     responses:
-   *       200:
-   *         description: List of user's incidents
-   *       401:
-   *         description: Unauthorized
-   */
-  async myReports(req: AuthRequest, res: Response): Promise<void> {
+  async myReports(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Authentication required' }, 401);
       }
-      const incidents = await incidentService.getMyReports(req.user.id);
-      res.json({ incidents });
+      const incidents = await incidentService.getMyReports(db, user.id);
+      return c.json({ incidents });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      return c.json({ error: error.message }, 500);
     }
   }
 
-  /**
-   * @openapi
-   * /api/incidents/{id}:
-   *   get:
-   *     tags: [Incidents]
-   *     summary: Get incident by ID
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: integer
-   *     responses:
-   *       200:
-   *         description: Incident details
-   *       404:
-   *         description: Not found
-   */
-  async getById(req: AuthRequest, res: Response): Promise<void> {
+  async getById(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      const id = parseInt(req.params.id, 10);
+      const id = parseInt(c.req.param('id')!, 10);
       if (isNaN(id)) {
-        res.status(400).json({ error: 'Invalid incident ID' });
-        return;
+        return c.json({ error: 'Invalid incident ID' }, 400);
       }
-      const incident = await incidentService.getIncident(id, req.user?.id);
-      res.json({ incident });
+      const incident = await incidentService.getIncident(db, id, c.get('user')?.id);
+      return c.json({ incident });
     } catch (error: any) {
       if (error.message === 'Incident not found') {
-        res.status(404).json({ error: error.message });
-        return;
+        return c.json({ error: error.message }, 404);
       }
-      res.status(500).json({ error: error.message });
+      return c.json({ error: error.message }, 500);
     }
   }
 
-  /**
-   * @openapi
-   * /api/incidents/{id}:
-   *   put:
-   *     tags: [Incidents]
-   *     summary: Update a draft incident
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: integer
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             $ref: '#/components/schemas/IncidentUpdateInput'
-   *     responses:
-   *       200:
-   *         description: Updated incident
-   *       400:
-   *         description: Validation error or not a draft
-   *       403:
-   *         description: Access denied
-   */
-  async update(req: AuthRequest, res: Response): Promise<void> {
+  async update(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Authentication required' }, 401);
       }
-      const id = parseInt(req.params.id, 10);
+      const id = parseInt(c.req.param('id')!, 10);
       if (isNaN(id)) {
-        res.status(400).json({ error: 'Invalid incident ID' });
-        return;
+        return c.json({ error: 'Invalid incident ID' }, 400);
       }
-      const data: IncidentUpdateInput = req.body;
-      const incident = await incidentService.updateIncident(id, data, req.user.id);
+      const data: IncidentUpdateInput = await c.req.json();
+      const incident = await incidentService.updateIncident(db, id, data, user.id);
 
       try {
-        await auditLogService.writeLog({
-          user_id: req.user.id,
+        await auditLogService.writeLog(db, {
+          user_id: user.id,
           action: 'incident_updated',
           entity_type: 'incident',
           entity_id: id,
           details: { incident_id: id, changed_fields: Object.keys(data) },
-          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+          ip_address:
+            c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown',
         });
       } catch { /* audit log failure must not break the main action */ }
 
-      res.json({ message: 'Incident updated', incident });
+      return c.json({ message: 'Incident updated', incident });
     } catch (error: any) {
       if (error.message === 'Access denied') {
-        res.status(403).json({ error: error.message });
-        return;
+        return c.json({ error: error.message }, 403);
       }
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
-  /**
-   * @openapi
-   * /api/incidents/{id}:
-   *   delete:
-   *     tags: [Incidents]
-   *     summary: Delete a draft incident
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: integer
-   *     responses:
-   *       200:
-   *         description: Deleted
-   *       400:
-   *         description: Not a draft
-   *       403:
-   *         description: Access denied
-   */
-  async delete(req: AuthRequest, res: Response): Promise<void> {
+  async delete(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Authentication required' }, 401);
       }
-      const id = parseInt(req.params.id, 10);
+      const id = parseInt(c.req.param('id')!, 10);
       if (isNaN(id)) {
-        res.status(400).json({ error: 'Invalid incident ID' });
-        return;
+        return c.json({ error: 'Invalid incident ID' }, 400);
       }
-      await incidentService.deleteIncident(id, req.user.id);
+      await incidentService.deleteIncident(db, id, user.id);
 
       try {
-        await auditLogService.writeLog({
-          user_id: req.user.id,
+        await auditLogService.writeLog(db, {
+          user_id: user.id,
           action: 'incident_deleted',
           entity_type: 'incident',
           entity_id: id,
           details: { incident_id: id },
-          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+          ip_address:
+            c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown',
         });
       } catch { /* audit log failure must not break the main action */ }
 
-      res.json({ message: 'Incident deleted' });
+      return c.json({ message: 'Incident deleted' });
     } catch (error: any) {
       if (error.message === 'Access denied') {
-        res.status(403).json({ error: error.message });
-        return;
+        return c.json({ error: error.message }, 403);
       }
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
-  /**
-   * @openapi
-   * /api/incidents/company/{gstn}:
-   *   get:
-   *     tags: [Incidents]
-   *     summary: Get incidents for a specific company by GSTN
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: gstn
-   *         required: true
-   *         schema:
-   *           type: string
-   *     responses:
-   *       200:
-   *         description: List of incidents
-   */
-  async getByGstn(req: AuthRequest, res: Response): Promise<void> {
+  async getByGstn(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      const { gstn } = req.params;
-      const incidents = await incidentService.getIncidentsByGstn(gstn);
-      res.json({ incidents });
+      const gstn = c.req.param('gstn')!;
+      const incidents = await incidentService.getIncidentsByGstn(db, gstn);
+      return c.json({ incidents });
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 }

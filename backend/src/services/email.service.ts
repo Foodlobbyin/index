@@ -1,3 +1,4 @@
+// @ts-nocheck — Deferred: nodemailer SMTP is not Workers-compatible. Re-implement with an HTTP email API in a later phase.
 import nodemailer from 'nodemailer';
 
 // Email configuration from environment variables

@@ -1,10 +1,10 @@
+import type { DbClient } from '../config/database';
 import incidentRepository from '../repositories/incident.repository';
 import { Incident, IncidentCreateInput, IncidentUpdateInput, IncidentSearchParams } from '../models/Incident';
 import gstnService from './gstn.service';
-import pool from '../config/database';
 
 export class IncidentService {
-  async createIncident(data: IncidentCreateInput): Promise<Incident> {
+  async createIncident(db: DbClient, data: IncidentCreateInput): Promise<Incident> {
     if (data.company_gstn) gstnService.assertValid(data.company_gstn);
 
     if (!data.company_name?.trim()) throw new Error('Company name is required');
@@ -17,24 +17,24 @@ export class IncidentService {
       throw new Error(`Invalid incident type. Must be one of: ${validTypes.join(', ')}`);
     }
 
-    return incidentRepository.create(data);
+    return incidentRepository.create(db, data);
   }
 
-  async submitIncident(id: number, reporterId?: number): Promise<Incident> {
-    const incident = await incidentRepository.findById(id);
+  async submitIncident(db: DbClient, id: number, reporterId?: number): Promise<Incident> {
+    const incident = await incidentRepository.findById(db, id);
     if (!incident) throw new Error('Incident not found');
     if (incident.status !== 'draft') throw new Error('Only draft incidents can be submitted');
     if (reporterId !== undefined && incident.reporter_id !== reporterId) {
       throw new Error('Access denied');
     }
 
-    const updated = await incidentRepository.updateStatus(id, 'submitted');
+    const updated = await incidentRepository.updateStatus(db, id, 'submitted');
     if (!updated) throw new Error('Failed to submit incident');
     return updated;
   }
 
-  async getIncident(id: number, requesterId?: number, isModerator = false): Promise<Incident> {
-    const incident = await incidentRepository.findById(id);
+  async getIncident(db: DbClient, id: number, requesterId?: number, isModerator = false): Promise<Incident> {
+    const incident = await incidentRepository.findById(db, id);
     if (!incident) throw new Error('Incident not found');
 
     // Hide reporter details for anonymous incidents unless requester is the reporter or a moderator
@@ -51,21 +51,21 @@ export class IncidentService {
     return incident;
   }
 
-  async getMyReports(reporterId: number): Promise<Incident[]> {
-    return incidentRepository.findByReporterId(reporterId);
+  async getMyReports(db: DbClient, reporterId: number): Promise<Incident[]> {
+    return incidentRepository.findByReporterId(db, reporterId);
   }
 
-  async searchIncidents(params: IncidentSearchParams, userId?: number): Promise<{ incidents: Incident[]; total: number }> {
+  async searchIncidents(db: DbClient, params: IncidentSearchParams, userId?: number): Promise<{ incidents: Incident[]; total: number }> {
     // Track search count for rate limiting
     if (userId) {
-      await this.trackSearchCount(userId);
+      await this.trackSearchCount(db, userId);
     }
-    return incidentRepository.search(params);
+    return incidentRepository.search(db, params);
   }
 
-  private async trackSearchCount(userId: number): Promise<void> {
+  private async trackSearchCount(db: DbClient, userId: number): Promise<void> {
     // Reset daily count if last reset was not today (in IST)
-    await pool.query(
+    await db.query(
       `UPDATE users SET
         daily_search_count = CASE
           WHEN last_search_reset_date IS NULL OR last_search_reset_date < CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'
@@ -78,9 +78,9 @@ export class IncidentService {
     );
   }
 
-  async checkSearchRateLimit(userId: number): Promise<void> {
-    const limit = parseInt(process.env.RATE_LIMIT_MAX || '100', 10);
-    const result = await pool.query(
+  async checkSearchRateLimit(db: DbClient, userId: number, rateLimitMax: number = 100): Promise<void> {
+    const limit = rateLimitMax;
+    const result = await db.query(
       `SELECT daily_search_count, last_search_reset_date FROM users WHERE id = $1`,
       [userId]
     );
@@ -97,31 +97,31 @@ export class IncidentService {
     }
   }
 
-  async updateIncident(id: number, data: IncidentUpdateInput, reporterId: number): Promise<Incident> {
-    const incident = await incidentRepository.findById(id);
+  async updateIncident(db: DbClient, id: number, data: IncidentUpdateInput, reporterId: number): Promise<Incident> {
+    const incident = await incidentRepository.findById(db, id);
     if (!incident) throw new Error('Incident not found');
     if (incident.reporter_id !== reporterId) throw new Error('Access denied');
     if (incident.status !== 'draft') throw new Error('Only draft incidents can be updated');
 
     if (data.company_gstn) gstnService.assertValid(data.company_gstn);
 
-    const updated = await incidentRepository.update(id, data);
+    const updated = await incidentRepository.update(db, id, data);
     if (!updated) throw new Error('Failed to update incident');
     return updated;
   }
 
-  async deleteIncident(id: number, reporterId: number): Promise<void> {
-    const incident = await incidentRepository.findById(id);
+  async deleteIncident(db: DbClient, id: number, reporterId: number): Promise<void> {
+    const incident = await incidentRepository.findById(db, id);
     if (!incident) throw new Error('Incident not found');
     if (incident.reporter_id !== reporterId) throw new Error('Access denied');
     if (incident.status !== 'draft') throw new Error('Only draft incidents can be deleted');
 
-    await incidentRepository.delete(id);
+    await incidentRepository.delete(db, id);
   }
 
-  async getIncidentsByGstn(gstn: string): Promise<Incident[]> {
+  async getIncidentsByGstn(db: DbClient, gstn: string): Promise<Incident[]> {
     gstnService.assertValid(gstn);
-    return incidentRepository.findByGstn(gstn);
+    return incidentRepository.findByGstn(db, gstn);
   }
 }
 

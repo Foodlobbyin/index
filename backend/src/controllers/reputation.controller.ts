@@ -1,5 +1,6 @@
-import { Request, Response } from 'express';
-import { AuthRequest } from '../middleware/auth.middleware';
+import type { Context } from 'hono';
+import type { AppBindings } from '../types/env';
+import { createDbClient } from '../config/database';
 import reputationService from '../services/reputation.service';
 import auditLogService from '../services/auditLog.service';
 import reputationRepository from '../repositories/reputation.repository';
@@ -10,22 +11,22 @@ class ReputationController {
    * GET /api/reputation/by-gstn/:gstn
    * Returns reputation score for a GSTN-registered company.
    */
-  getByGstn = async (req: Request, res: Response): Promise<void> => {
-    const { gstn } = req.params;
+  getByGstn = async (c: Context<AppBindings>): Promise<Response> => {
+    const gstn = c.req.param('gstn');
 
     if (!gstn || gstn.trim().length < 15) {
-      res.status(400).json({
+      return c.json({
         error: 'Bad Request',
         message: 'A valid 15-character GSTN is required.',
-      });
-      return;
+      }, 400);
     }
 
     try {
-      const result = await reputationService.getReputationByGstn(gstn.trim().toUpperCase());
-      res.json(result);
+      const db = createDbClient(c.env.DATABASE_URL);
+      const result = await reputationService.getReputationByGstn(db, gstn.trim().toUpperCase());
+      return c.json(result);
     } catch (err: any) {
-      res.status(500).json({ error: 'Internal Server Error', message: err.message });
+      return c.json({ error: 'Internal Server Error', message: err.message }, 500);
     }
   };
 
@@ -37,31 +38,30 @@ class ReputationController {
    * Returns an array — one person can be associated with multiple firms.
    * Returns 404 if no company is linked to this number.
    */
-  getByMobile = async (req: Request, res: Response): Promise<void> => {
-    const { phone } = req.params;
+  getByMobile = async (c: Context<AppBindings>): Promise<Response> => {
+    const phone = c.req.param('phone');
 
     if (!phone || phone.trim().length < 7) {
-      res.status(400).json({
+      return c.json({
         error: 'Bad Request',
         message: 'A valid phone/mobile number is required.',
-      });
-      return;
+      }, 400);
     }
 
     try {
-      const results = await reputationService.getReputationByPhone(phone.trim());
+      const db = createDbClient(c.env.DATABASE_URL);
+      const results = await reputationService.getReputationByPhone(db, phone.trim());
 
       if (results.length === 0) {
-        res.status(404).json({
+        return c.json({
           error: 'Not Found',
           message: 'No company found linked to this phone number.',
-        });
-        return;
+        }, 404);
       }
 
-      res.json({ results });
+      return c.json({ results });
     } catch (err: any) {
-      res.status(500).json({ error: 'Internal Server Error', message: err.message });
+      return c.json({ error: 'Internal Server Error', message: err.message }, 500);
     }
   };
 
@@ -70,18 +70,19 @@ class ReputationController {
    * Force-recalculates and persists the reputation score for a GSTN company.
    * Requires authentication.
    */
-  recalculate = async (req: AuthRequest, res: Response): Promise<void> => {
-    const { gstn } = req.params;
+  recalculate = async (c: Context<AppBindings>): Promise<Response> => {
+    const gstn = c.req.param('gstn')!;
 
     try {
-      const oldScore = await reputationRepository.getStoredScoreByGstn(gstn);
-      const newScore = await reputationService.recalculateAndPersistByGstn(gstn);
+      const db = createDbClient(c.env.DATABASE_URL);
+      const oldScore = await reputationRepository.getStoredScoreByGstn(db, gstn);
+      const newScore = await reputationService.recalculateAndPersistByGstn(db, gstn);
 
       try {
-        await auditLogService.writeLog({
+        await auditLogService.writeLog(db, {
           action: 'reputation_score_recalculated',
           entity_type: 'company',
-          user_id: req.user?.id ?? null,
+          user_id: c.get('user')?.id ?? null,
           details: {
             gstn,
             old_score: oldScore,
@@ -90,9 +91,9 @@ class ReputationController {
         });
       } catch { /* audit failure must not break main action */ }
 
-      res.json({ gstn, old_score: oldScore, new_score: newScore });
+      return c.json({ gstn, old_score: oldScore, new_score: newScore });
     } catch (err: any) {
-      res.status(500).json({ error: 'Internal Server Error', message: err.message });
+      return c.json({ error: 'Internal Server Error', message: err.message }, 500);
     }
   };
 }

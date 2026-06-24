@@ -1,3 +1,4 @@
+// @ts-nocheck — Deferred: swagger-jsdoc/swagger-ui-express + Express are not Workers-compatible. The OpenAPI definition is preserved here for re-wiring via a Workers-friendly approach in a later phase.
 import swaggerJSDoc from 'swagger-jsdoc';
 import { Express } from 'express';
 import swaggerUi from 'swagger-ui-express';

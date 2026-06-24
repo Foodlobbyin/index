@@ -1,10 +1,11 @@
-import { Router } from 'express';
+import { Hono } from 'hono';
+import type { AppBindings } from '../types/env';
 import auditLogController from '../controllers/auditLog.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { apiLimiter } from '../middleware/rateLimiter';
 import { requireTrustLevel } from '../middleware/trustLevel.middleware';
 
-const router = Router();
+const router = new Hono<AppBindings>();
 
 // All audit log routes require authentication (admin/moderator only)
 router.use(apiLimiter);

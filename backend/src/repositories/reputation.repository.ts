@@ -1,4 +1,4 @@
-import pool from '../config/database';
+import type { DbClient } from '../config/database';
 
 class ReputationRepository {
 
@@ -9,9 +9,10 @@ class ReputationRepository {
    * Used when per-incident dates are not needed (e.g. simple scoring).
    */
   async getIncidentCountsByGstn(
+    db: DbClient,
     gstn: string
   ): Promise<{ incident_type: string; count: number }[]> {
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT incident_type, COUNT(*)::int AS count
        FROM incidents
        WHERE company_gstn = $1
@@ -27,9 +28,10 @@ class ReputationRepository {
    * Per-incident rows with dates — used for recency-decay score calculation.
    */
   async getIncidentsWithDatesByGstn(
+    db: DbClient,
     gstn: string
   ): Promise<{ incident_type: string; created_at: Date }[]> {
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT incident_type, created_at
        FROM incidents
        WHERE company_gstn = $1
@@ -42,8 +44,8 @@ class ReputationRepository {
   }
 
   /** Most recent company name recorded against this GSTN. */
-  async getCompanyNameByGstn(gstn: string): Promise<string | null> {
-    const result = await pool.query(
+  async getCompanyNameByGstn(db: DbClient, gstn: string): Promise<string | null> {
+    const result = await db.query(
       `SELECT company_name FROM incidents
        WHERE company_gstn = $1
        ORDER BY created_at DESC
@@ -54,8 +56,8 @@ class ReputationRepository {
   }
 
   /** Stored score from company_profiles (if the company has a profile row). */
-  async getStoredScoreByGstn(gstn: string): Promise<number | null> {
-    const result = await pool.query(
+  async getStoredScoreByGstn(db: DbClient, gstn: string): Promise<number | null> {
+    const result = await db.query(
       `SELECT cp.reputation_score
        FROM company_profiles cp
        JOIN users u ON cp.user_id = u.id
@@ -66,8 +68,8 @@ class ReputationRepository {
     return result.rows[0]?.reputation_score ?? null;
   }
 
-  async updateScoreByGstn(gstn: string, score: number): Promise<void> {
-    await pool.query(
+  async updateScoreByGstn(db: DbClient, gstn: string, score: number): Promise<void> {
+    await db.query(
       `UPDATE company_profiles
        SET reputation_score = $1
        WHERE user_id = (SELECT id FROM users WHERE gstn = $2)`,
@@ -84,9 +86,10 @@ class ReputationRepository {
    * column in contact_persons is a plain name string.
    */
   async getCompanyNamesByPhone(
+    db: DbClient,
     phone: string
   ): Promise<string[]> {
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT DISTINCT company
        FROM contact_persons
        WHERE phone = $1
@@ -105,9 +108,10 @@ class ReputationRepository {
    * incidents so that a firm with a GSTN is also found via mobile lookup.
    */
   async getIncidentsWithDatesByCompanyName(
+    db: DbClient,
     companyName: string
   ): Promise<{ incident_type: string; created_at: Date; company_gstn: string | null }[]> {
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT incident_type, created_at, company_gstn
        FROM incidents
        WHERE LOWER(company_name) = LOWER($1)
@@ -124,8 +128,8 @@ class ReputationRepository {
    * or phone_number and linked it to their company profile.
    * Returns the company name from company_profiles if found.
    */
-  async getCompanyNameByUserPhone(phone: string): Promise<string | null> {
-    const result = await pool.query(
+  async getCompanyNameByUserPhone(db: DbClient, phone: string): Promise<string | null> {
+    const result = await db.query(
       `SELECT cp.company_name
        FROM company_profiles cp
        JOIN users u ON cp.user_id = u.id

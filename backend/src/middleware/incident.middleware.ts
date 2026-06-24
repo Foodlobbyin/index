@@ -1,50 +1,42 @@
-import { Response, NextFunction } from 'express';
-import { AuthRequest } from './auth.middleware';
+import type { MiddlewareHandler } from 'hono';
+import type { AppBindings } from '../types/env';
+import { createDbClient } from '../config/database';
 import incidentRepository from '../repositories/incident.repository';
 
-export const validateIncidentOwnership = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+export const validateIncidentOwnership: MiddlewareHandler<AppBindings> = async (c, next) => {
   try {
-    const incidentId = parseInt(req.params.id, 10);
+    const incidentId = parseInt(c.req.param('id') ?? '', 10);
     if (isNaN(incidentId)) {
-      res.status(400).json({ error: 'Invalid incident ID' });
-      return;
+      return c.json({ error: 'Invalid incident ID' }, 400);
     }
 
-    const incident = await incidentRepository.findById(incidentId);
+    const db = createDbClient(c.env.DATABASE_URL);
+    const incident = await incidentRepository.findById(db, incidentId);
     if (!incident) {
-      res.status(404).json({ error: 'Incident not found' });
-      return;
+      return c.json({ error: 'Incident not found' }, 404);
     }
 
-    if (incident.reporter_id !== req.user?.id) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
+    const user = c.get('user');
+    if (incident.reporter_id !== user?.id) {
+      return c.json({ error: 'Access denied' }, 403);
     }
 
-    next();
+    await next();
   } catch {
-    res.status(500).json({ error: 'Internal server error' });
+    return c.json({ error: 'Internal server error' }, 500);
   }
 };
 
-export const requireDraftStatus = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+export const requireDraftStatus: MiddlewareHandler<AppBindings> = async (c, next) => {
   try {
-    const incidentId = parseInt(req.params.id, 10);
-    const incident = await incidentRepository.findById(incidentId);
+    const incidentId = parseInt(c.req.param('id') ?? '', 10);
+    const db = createDbClient(c.env.DATABASE_URL);
+    const incident = await incidentRepository.findById(db, incidentId);
     if (!incident || incident.status !== 'draft') {
-      res.status(400).json({ error: 'Only draft incidents can be modified' });
-      return;
+      return c.json({ error: 'Only draft incidents can be modified' }, 400);
     }
-    next();
+    await next();
   } catch {
-    res.status(500).json({ error: 'Internal server error' });
+    return c.json({ error: 'Internal server error' }, 500);
   }
 };

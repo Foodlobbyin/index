@@ -1,7 +1,7 @@
-import { Response } from 'express';
-import { AuthRequest } from '../middleware/auth.middleware';
-import { TrustLevel, TRUST_LEVEL_RANK } from '../middleware/trustLevel.middleware';
-import pool from '../config/database';
+import type { Context } from 'hono';
+import type { AppBindings } from '../types/env';
+import { TrustLevel } from '../middleware/trustLevel.middleware';
+import { createDbClient } from '../config/database';
 import auditLogService from '../services/auditLog.service';
 
 const VALID_TRUST_LEVELS: TrustLevel[] = ['new', 'verified', 'trusted', 'moderator', 'admin'];
@@ -11,55 +11,52 @@ class AdminController {
    * PUT /api/admin/users/:id/trust-level
    * Admin-only: promote or demote a user's trust level.
    */
-  async updateTrustLevel(req: AuthRequest, res: Response): Promise<void> {
-    const userId = parseInt(req.params.id, 10);
-    const { trust_level } = req.body as { trust_level?: string };
-    const actorId = req.user?.id;
+  async updateTrustLevel(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
+    const userId = parseInt(c.req.param('id')!, 10);
+    const { trust_level } = (await c.req.json()) as { trust_level?: string };
+    const actorId = c.get('user')?.id;
 
     if (isNaN(userId)) {
-      res.status(400).json({ error: 'Bad Request', message: 'Invalid user id.' });
-      return;
+      return c.json({ error: 'Bad Request', message: 'Invalid user id.' }, 400);
     }
 
     if (!trust_level || !VALID_TRUST_LEVELS.includes(trust_level as TrustLevel)) {
-      res.status(400).json({
+      return c.json({
         error: 'Bad Request',
         message: `trust_level must be one of: ${VALID_TRUST_LEVELS.join(', ')}`,
-      });
-      return;
+      }, 400);
     }
 
     // An admin cannot demote themselves to avoid being locked out
     if (actorId === userId) {
-      res.status(400).json({
+      return c.json({
         error: 'Bad Request',
         message: 'Admins cannot change their own trust level.',
-      });
-      return;
+      }, 400);
     }
 
     // Fetch the user to confirm existence
-    const userResult = await pool.query(
+    const userResult = await db.query(
       'SELECT id, username, email, trust_level FROM users WHERE id = $1',
       [userId]
     );
     if (userResult.rows.length === 0) {
-      res.status(404).json({ error: 'Not Found', message: 'User not found.' });
-      return;
+      return c.json({ error: 'Not Found', message: 'User not found.' }, 404);
     }
 
     const targetUser = userResult.rows[0];
     const previousLevel: string = targetUser.trust_level ?? 'new';
 
     // Apply the update
-    await pool.query('UPDATE users SET trust_level = $1 WHERE id = $2', [
+    await db.query('UPDATE users SET trust_level = $1 WHERE id = $2', [
       trust_level,
       userId,
     ]);
 
     // Log the action in audit_logs
     try {
-      await auditLogService.writeLog({
+      await auditLogService.writeLog(db, {
         action: 'TRUST_LEVEL_CHANGED',
         entity_type: 'user',
         entity_id: userId,
@@ -74,13 +71,13 @@ class AdminController {
       // Audit log failure must not block the response
     }
 
-    res.status(200).json({
+    return c.json({
       message: 'Trust level updated successfully.',
       user_id: userId,
       username: targetUser.username,
       previous_trust_level: previousLevel,
       new_trust_level: trust_level,
-    });
+    }, 200);
   }
 
   /**
@@ -88,8 +85,9 @@ class AdminController {
    * Admin/Moderator: list users eligible for trust-level promotion
    * (users with 3+ approved incidents whose trust_level is still 'new' or 'verified').
    */
-  async getPromotionCandidates(req: AuthRequest, res: Response): Promise<void> {
-    const result = await pool.query(
+  async getPromotionCandidates(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
+    const result = await db.query(
       `SELECT
          u.id,
          u.username,
@@ -106,7 +104,7 @@ class AdminController {
        ORDER BY approved_incident_count DESC`
     );
 
-    res.status(200).json({ candidates: result.rows });
+    return c.json({ candidates: result.rows }, 200);
   }
 }
 

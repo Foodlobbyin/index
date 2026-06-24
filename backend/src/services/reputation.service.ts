@@ -1,3 +1,4 @@
+import type { DbClient } from '../config/database';
 import { ReputationScore, IncidentTypeBreakdown } from '../models/Reputation';
 import reputationRepository from '../repositories/reputation.repository';
 
@@ -81,9 +82,9 @@ class ReputationService {
 
   // ─── Path 1: Lookup by GSTN ───────────────────────────────────────────────
 
-  async getReputationByGstn(gstn: string): Promise<ReputationScore> {
-    const incidents = await reputationRepository.getIncidentsWithDatesByGstn(gstn);
-    const companyName = await reputationRepository.getCompanyNameByGstn(gstn);
+  async getReputationByGstn(db: DbClient, gstn: string): Promise<ReputationScore> {
+    const incidents = await reputationRepository.getIncidentsWithDatesByGstn(db, gstn);
+    const companyName = await reputationRepository.getCompanyNameByGstn(db, gstn);
     const { score, breakdown, total } = scoreFromIncidents(incidents);
 
     return {
@@ -96,10 +97,10 @@ class ReputationService {
     };
   }
 
-  async recalculateAndPersistByGstn(gstn: string): Promise<number> {
-    const incidents = await reputationRepository.getIncidentsWithDatesByGstn(gstn);
+  async recalculateAndPersistByGstn(db: DbClient, gstn: string): Promise<number> {
+    const incidents = await reputationRepository.getIncidentsWithDatesByGstn(db, gstn);
     const score = scoreFromIncidents(incidents).score;
-    await reputationRepository.updateScoreByGstn(gstn, score);
+    await reputationRepository.updateScoreByGstn(db, gstn, score);
     return score;
   }
 
@@ -116,13 +117,13 @@ class ReputationService {
    *
    * Returns an array because one person can be linked to multiple firms.
    */
-  async getReputationByPhone(phone: string): Promise<ReputationScore[]> {
+  async getReputationByPhone(db: DbClient, phone: string): Promise<ReputationScore[]> {
     // Step 1: collect company names from both sources
     const namesFromContacts =
-      await reputationRepository.getCompanyNamesByPhone(phone);
+      await reputationRepository.getCompanyNamesByPhone(db, phone);
 
     const nameFromUserProfile =
-      await reputationRepository.getCompanyNameByUserPhone(phone);
+      await reputationRepository.getCompanyNameByUserPhone(db, phone);
 
     // Deduplicate (case-insensitive)
     const seen = new Set<string>();
@@ -145,7 +146,7 @@ class ReputationService {
 
     for (const companyName of companyNames) {
       const incidents =
-        await reputationRepository.getIncidentsWithDatesByCompanyName(companyName);
+        await reputationRepository.getIncidentsWithDatesByCompanyName(db, companyName);
 
       const { score, breakdown, total } = scoreFromIncidents(incidents);
 
@@ -169,13 +170,13 @@ class ReputationService {
   // ─── Backward-compat aliases ──────────────────────────────────────────────
 
   /** @deprecated use getReputationByGstn */
-  async getReputationSummary(gstn: string): Promise<ReputationScore> {
-    return this.getReputationByGstn(gstn);
+  async getReputationSummary(db: DbClient, gstn: string): Promise<ReputationScore> {
+    return this.getReputationByGstn(db, gstn);
   }
 
   /** @deprecated use recalculateAndPersistByGstn */
-  async recalculateAndPersist(gstn: string): Promise<number> {
-    return this.recalculateAndPersistByGstn(gstn);
+  async recalculateAndPersist(db: DbClient, gstn: string): Promise<number> {
+    return this.recalculateAndPersistByGstn(db, gstn);
   }
 }
 

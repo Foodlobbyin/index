@@ -3,6 +3,7 @@
  * Business logic for referral code management and validation
  */
 
+import type { DbClient } from '../config/database';
 import referralRepository from '../repositories/referral.repository';
 import { ReferralCreateInput, ReferralValidationResult } from '../models/Referral';
 
@@ -11,7 +12,7 @@ export class ReferralService {
    * Create a new referral code
    * Only admins or approved users can create referral codes
    */
-  async createReferralCode(input: ReferralCreateInput) {
+  async createReferralCode(db: DbClient, input: ReferralCreateInput) {
     // Validate max_uses
     if (input.max_uses !== undefined && input.max_uses < 1) {
       throw new Error('max_uses must be at least 1');
@@ -30,20 +31,20 @@ export class ReferralService {
       }
     }
 
-    return await referralRepository.create(input);
+    return await referralRepository.create(db, input);
   }
 
   /**
    * Validate a referral code
    * Returns validation result with referral details if valid
    */
-  async validateReferralCode(code: string, userEmail: string): Promise<ReferralValidationResult> {
+  async validateReferralCode(db: DbClient, code: string, userEmail: string): Promise<ReferralValidationResult> {
     if (!code) {
       return { isValid: false, error: 'Referral code is required' };
     }
 
     // Find referral
-    const referral = await referralRepository.findByCode(code);
+    const referral = await referralRepository.findByCode(db, code);
 
     if (!referral) {
       return { isValid: false, error: 'Invalid referral code' };
@@ -83,32 +84,32 @@ export class ReferralService {
   /**
    * Get all referral codes created by a user
    */
-  async getUserReferrals(userId: number) {
-    return await referralRepository.findByCreator(userId);
+  async getUserReferrals(db: DbClient, userId: number) {
+    return await referralRepository.findByCreator(db, userId);
   }
 
   /**
    * Get referral usage statistics
    */
-  async getReferralStats(code: string) {
-    return await referralRepository.getUsageStats(code);
+  async getReferralStats(db: DbClient, code: string) {
+    return await referralRepository.getUsageStats(db, code);
   }
 
   /**
    * Deactivate a referral code
    */
-  async deactivateReferral(referralId: number, userId: number) {
+  async deactivateReferral(db: DbClient, referralId: number, userId: number) {
     // In a real application, you'd check if the user owns this referral or is an admin
-    await referralRepository.updateStatus(referralId, false);
+    await referralRepository.updateStatus(db, referralId, false);
     return { message: 'Referral code deactivated successfully' };
   }
 
   /**
    * Activate a referral code
    */
-  async activateReferral(referralId: number, userId: number) {
+  async activateReferral(db: DbClient, referralId: number, userId: number) {
     // In a real application, you'd check if the user owns this referral or is an admin
-    await referralRepository.updateStatus(referralId, true);
+    await referralRepository.updateStatus(db, referralId, true);
     return { message: 'Referral code activated successfully' };
   }
 }

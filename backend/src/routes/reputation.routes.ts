@@ -1,9 +1,10 @@
-import { Router } from 'express';
+import { Hono } from 'hono';
+import type { AppBindings } from '../types/env';
 import reputationController from '../controllers/reputation.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { apiLimiter } from '../middleware/rateLimiter';
 
-const router = Router();
+const router = new Hono<AppBindings>();
 
 router.use(apiLimiter);
 

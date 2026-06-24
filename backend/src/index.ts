@@ -1,6 +1,6 @@
-import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import type { AppBindings } from './types/env';
 import authRoutes from './routes/auth.routes';
 import secureAuthRoutes from './routes/secure-auth.routes';
 import referralRoutes from './routes/referral.routes';
@@ -14,65 +14,24 @@ import auditLogRoutes from './routes/auditLog.routes';
 import adminRoutes from './routes/admin.routes';
 import healthRoutes from './routes/health';
 import { apiLimiter } from './middleware/rateLimiter';
-import { setupSwagger } from './config/swagger';
 
-const app = express();
-// Catalyst AppSail injects the listen port via X_ZOHO_CATALYST_LISTEN_PORT.
-// Fallback to PORT for other hosts (Render/Railway/etc) and finally 5000 for local dev.
-const PORT = process.env.X_ZOHO_CATALYST_LISTEN_PORT || process.env.PORT || 5000;
+const app = new Hono<AppBindings>();
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// CORS for all routes.
+app.use('*', cors());
 
-// Setup Swagger documentation
-setupSwagger(app);
+// TODO(swagger): Swagger/OpenAPI docs are not yet wired up for the Workers
+// runtime. The previous Express setup used swagger-jsdoc + swagger-ui-express,
+// which are not Workers-compatible. Re-introduce via a Workers-friendly
+// approach (e.g. serving a pre-generated OpenAPI JSON) in a later phase.
 
-// Apply general rate limiting to all API routes
-app.use('/api', apiLimiter as unknown as express.RequestHandler);
+// Apply general rate limiting to all API routes.
+app.use('/api/*', apiLimiter);
 
-// Health check
-/**
- * @openapi
- * /api/health:
- *   get:
- *     tags:
- *       - Health
- *     summary: API health check
- *     description: Returns the health status of the API and enabled features
- *     responses:
- *       200:
- *         description: API is healthy
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: OK
- *                 timestamp:
- *                   type: string
- *                   format: date-time
- *                 service:
- *                   type: string
- *                   example: Foodlobbyin API
- *                 features:
- *                   type: object
- *                   properties:
- *                     secureRegistration:
- *                       type: boolean
- *                     referralSystem:
- *                       type: boolean
- *                     otpVerification:
- *                       type: boolean
- *                     gstnValidation:
- *                       type: boolean
- */
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+// Health check (kept inline to preserve the exact response shape).
+app.get('/api/health', (c) => {
+  return c.json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     service: 'Foodlobbyin API',
     features: {
@@ -81,43 +40,33 @@ app.get('/api/health', (req, res) => {
       otpVerification: true,
       gstnValidation: true,
       incidentManagement: true,
-    }
+    },
   });
 });
 
 // Routes
-app.use('/api/health', healthRoutes);
-app.use('/api/auth', authRoutes); // Legacy auth routes
-app.use('/api/secure-auth', secureAuthRoutes); // New secure auth routes with referral
-app.use('/api/referrals', referralRoutes); // Referral management routes
-app.use('/api/company', companyRoutes);
-app.use('/api/invoices', invoiceRoutes);
-app.use('/api/insights', insightsRoutes);
-app.use('/api/incidents', incidentRoutes);
-app.use('/api/moderation', moderationRoutes);
-app.use('/api/reputation', reputationRoutes);
-app.use('/api/audit-logs', auditLogRoutes);
-app.use('/api/admin', adminRoutes);
+app.route('/api/health', healthRoutes);
+app.route('/api/auth', authRoutes); // Legacy auth routes
+app.route('/api/secure-auth', secureAuthRoutes); // New secure auth routes with referral
+app.route('/api/referrals', referralRoutes); // Referral management routes
+app.route('/api/company', companyRoutes);
+app.route('/api/invoices', invoiceRoutes);
+app.route('/api/insights', insightsRoutes);
+app.route('/api/incidents', incidentRoutes);
+app.route('/api/moderation', moderationRoutes);
+app.route('/api/reputation', reputationRoutes);
+app.route('/api/audit-logs', auditLogRoutes);
+app.route('/api/admin', adminRoutes);
 
 // 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
+app.notFound((c) => {
+  return c.json({ error: 'Route not found' }, 404);
 });
 
 // Error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.onError((err, c) => {
   console.error('Error:', err);
-  res.status(500).json({ error: 'Internal server error' });
-});
-
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📍 API: http://localhost:${PORT}/api`);
-  console.log(`📚 API Docs: http://localhost:${PORT}/api-docs`);
-  console.log(`💚 Health: http://localhost:${PORT}/api/health`);
-  console.log(`🔒 Secure Auth: http://localhost:${PORT}/api/secure-auth`);
-  console.log(`🎫 Referrals: http://localhost:${PORT}/api/referrals`);
+  return c.json({ error: 'Internal server error' }, 500);
 });
 
 export default app;

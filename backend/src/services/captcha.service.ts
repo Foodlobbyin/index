@@ -3,11 +3,7 @@
  * Handles reCAPTCHA v3 verification for bot protection
  */
 
-import https from 'https';
-
-const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY || '';
 const RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify';
-const RECAPTCHA_THRESHOLD = parseFloat(process.env.RECAPTCHA_THRESHOLD || '0.5');
 
 interface RecaptchaResponse {
   success: boolean;
@@ -22,15 +18,19 @@ export class CaptchaService {
   /**
    * Verify reCAPTCHA token
    * @param token The reCAPTCHA token from the client
+   * @param recaptchaSecretKey The reCAPTCHA secret key (from env, threaded in)
    * @param expectedAction The expected action (e.g., 'register', 'login')
+   * @param recaptchaThreshold The minimum score threshold
    * @returns Promise<{ isValid: boolean; score?: number; error?: string }>
    */
   async verifyRecaptcha(
     token: string,
-    expectedAction?: string
+    recaptchaSecretKey: string,
+    expectedAction?: string,
+    recaptchaThreshold: number = 0.5
   ): Promise<{ isValid: boolean; score?: number; error?: string }> {
     // If reCAPTCHA is not configured, skip verification (for development)
-    if (!RECAPTCHA_SECRET_KEY || RECAPTCHA_SECRET_KEY === 'your-recaptcha-secret-key') {
+    if (!recaptchaSecretKey || recaptchaSecretKey === 'your-recaptcha-secret-key') {
       console.warn('reCAPTCHA verification skipped: RECAPTCHA_SECRET_KEY not configured');
       return { isValid: true, score: 1.0 };
     }
@@ -40,7 +40,7 @@ export class CaptchaService {
     }
 
     try {
-      const response = await this.makeRecaptchaRequest(token);
+      const response = await this.makeRecaptchaRequest(token, recaptchaSecretKey);
 
       if (!response.success) {
         const errors = response['error-codes'] || [];
@@ -56,7 +56,7 @@ export class CaptchaService {
       }
 
       // Check if score is above threshold
-      if (score < RECAPTCHA_THRESHOLD) {
+      if (score < recaptchaThreshold) {
         return { isValid: false, error: 'reCAPTCHA score too low (possible bot)', score };
       }
 
@@ -68,52 +68,24 @@ export class CaptchaService {
   }
 
   /**
-   * Make HTTP request to Google reCAPTCHA API
+   * Make HTTP request to Google reCAPTCHA API using fetch (Workers-compatible)
    */
-  private makeRecaptchaRequest(token: string): Promise<RecaptchaResponse> {
-    return new Promise((resolve, reject) => {
-      const postData = `secret=${encodeURIComponent(RECAPTCHA_SECRET_KEY)}&response=${encodeURIComponent(token)}`;
-
-      const options = {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Content-Length': Buffer.byteLength(postData),
-        },
-      };
-
-      const req = https.request(RECAPTCHA_VERIFY_URL, options, (res) => {
-        let data = '';
-
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-
-        res.on('end', () => {
-          try {
-            const response: RecaptchaResponse = JSON.parse(data);
-            resolve(response);
-          } catch (error) {
-            reject(new Error('Failed to parse reCAPTCHA response'));
-          }
-        });
-      });
-
-      req.on('error', (error) => {
-        reject(error);
-      });
-
-      req.write(postData);
-      req.end();
+  private async makeRecaptchaRequest(token: string, recaptchaSecretKey: string): Promise<RecaptchaResponse> {
+    const res = await fetch(RECAPTCHA_VERIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ secret: recaptchaSecretKey, response: token }).toString(),
     });
+
+    return (await res.json()) as RecaptchaResponse;
   }
 
   /**
    * Check if captcha verification should be enforced
    * In development, captcha may be optional
    */
-  shouldEnforceCaptcha(): boolean {
-    return process.env.NODE_ENV === 'production' && Boolean(RECAPTCHA_SECRET_KEY);
+  shouldEnforceCaptcha(nodeEnv: string, recaptchaSecretKey: string): boolean {
+    return nodeEnv === 'production' && Boolean(recaptchaSecretKey);
   }
 }
 

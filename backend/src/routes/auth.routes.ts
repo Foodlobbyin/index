@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Hono } from 'hono';
+import type { AppBindings } from '../types/env';
 import authController from '../controllers/auth.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { authLimiter } from '../middleware/rateLimiter';
@@ -12,7 +13,7 @@ import {
   loginWithOTPSchema,
 } from '../middleware/validate.middleware';
 
-const router = Router();
+const router = new Hono<AppBindings>();
 
 /**
  * @openapi
@@ -85,7 +86,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/register', authLimiter, validate(registerSchema), (req, res) => authController.register(req, res));
+router.post('/register', authLimiter, validate(registerSchema), authController.register);
 
 /**
  * @openapi
@@ -139,7 +140,7 @@ router.post('/register', authLimiter, validate(registerSchema), (req, res) => au
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/login', authLimiter, validate(loginSchema), (req, res) => authController.login(req, res));
+router.post('/login', authLimiter, validate(loginSchema), authController.login);
 
 /**
  * @openapi
@@ -175,7 +176,7 @@ router.post('/login', authLimiter, validate(loginSchema), (req, res) => authCont
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/verify-email', (req, res) => authController.verifyEmail(req, res));
+router.get('/verify-email', authController.verifyEmail);
 
 /**
  * @openapi
@@ -216,7 +217,7 @@ router.get('/verify-email', (req, res) => authController.verifyEmail(req, res));
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/request-password-reset', authLimiter, validate(forgotPasswordSchema), (req, res) => authController.requestPasswordReset(req, res));
+router.post('/request-password-reset', authLimiter, validate(forgotPasswordSchema), authController.requestPasswordReset);
 
 /**
  * @openapi
@@ -261,7 +262,7 @@ router.post('/request-password-reset', authLimiter, validate(forgotPasswordSchem
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/reset-password', authLimiter, validate(resetPasswordSchema), (req, res) => authController.resetPassword(req, res));
+router.post('/reset-password', authLimiter, validate(resetPasswordSchema), authController.resetPassword);
 
 /**
  * @openapi
@@ -302,7 +303,7 @@ router.post('/reset-password', authLimiter, validate(resetPasswordSchema), (req,
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/request-email-otp', authLimiter, validate(requestEmailOTPSchema), (req, res) => authController.requestEmailOTP(req, res));
+router.post('/request-email-otp', authLimiter, validate(requestEmailOTPSchema), authController.requestEmailOTP);
 
 /**
  * @openapi
@@ -349,7 +350,7 @@ router.post('/request-email-otp', authLimiter, validate(requestEmailOTPSchema), 
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/login-with-otp', authLimiter, validate(loginWithOTPSchema), (req, res) => authController.loginWithEmailOTP(req, res));
+router.post('/login-with-otp', authLimiter, validate(loginWithOTPSchema), authController.loginWithEmailOTP);
 
 /**
  * @openapi
@@ -375,6 +376,6 @@ router.post('/login-with-otp', authLimiter, validate(loginWithOTPSchema), (req, 
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/profile', authMiddleware, (req, res) => authController.getProfile(req, res));
+router.get('/profile', authMiddleware, authController.getProfile);
 
 export default router;

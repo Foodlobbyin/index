@@ -1,10 +1,10 @@
-import pool from '../config/database';
+import type { DbClient } from '../config/database';
 import { Invoice, InvoiceCreateInput, InvoiceUpdateInput, MarketInsights } from '../models/Invoice';
 
 export class InvoiceRepository {
-  async create(companyId: number, invoice: InvoiceCreateInput): Promise<Invoice> {
+  async create(db: DbClient, companyId: number, invoice: InvoiceCreateInput): Promise<Invoice> {
     const { invoice_number, amount, issue_date, due_date, status, description, category } = invoice;
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO invoices (company_id, invoice_number, amount, issue_date, due_date, status, description, category) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
        RETURNING *`,
@@ -13,41 +13,41 @@ export class InvoiceRepository {
     return result.rows[0];
   }
 
-  async findByCompanyId(companyId: number): Promise<Invoice[]> {
-    const result = await pool.query(
+  async findByCompanyId(db: DbClient, companyId: number): Promise<Invoice[]> {
+    const result = await db.query(
       'SELECT * FROM invoices WHERE company_id = $1 ORDER BY created_at DESC',
       [companyId]
     );
     return result.rows;
   }
 
-  async findById(id: number): Promise<Invoice | null> {
-    const result = await pool.query('SELECT * FROM invoices WHERE id = $1', [id]);
+  async findById(db: DbClient, id: number): Promise<Invoice | null> {
+    const result = await db.query('SELECT * FROM invoices WHERE id = $1', [id]);
     return result.rows[0] || null;
   }
 
-  async update(id: number, invoice: InvoiceUpdateInput): Promise<Invoice | null> {
+  async update(db: DbClient, id: number, invoice: InvoiceUpdateInput): Promise<Invoice | null> {
     const fields = Object.keys(invoice)
       .filter((key) => invoice[key as keyof InvoiceUpdateInput] !== undefined)
       .map((key, index) => `${key} = $${index + 2}`)
       .join(', ');
     
-    if (fields.length === 0) return this.findById(id);
+    if (fields.length === 0) return this.findById(db, id);
 
     const values = Object.values(invoice).filter((val) => val !== undefined);
-    const result = await pool.query(
+    const result = await db.query(
       `UPDATE invoices SET ${fields} WHERE id = $1 RETURNING *`,
       [id, ...values]
     );
     return result.rows[0] || null;
   }
 
-  async delete(id: number): Promise<boolean> {
-    const result = await pool.query('DELETE FROM invoices WHERE id = $1', [id]);
-    return (result.rowCount ?? 0) > 0;
+  async delete(db: DbClient, id: number): Promise<boolean> {
+    const result = await db.query('DELETE FROM invoices WHERE id = $1 RETURNING id', [id]);
+    return result.rows.length > 0;
   }
 
-  async getMarketInsights(industry?: string): Promise<MarketInsights[]> {
+  async getMarketInsights(db: DbClient, industry?: string): Promise<MarketInsights[]> {
     let query = `
       SELECT 
         cp.industry,
@@ -69,7 +69,7 @@ export class InvoiceRepository {
     
     query += ' GROUP BY cp.industry ORDER BY data_points DESC';
     
-    const result = await pool.query(query, params);
+    const result = await db.query(query, params);
     return result.rows;
   }
 }

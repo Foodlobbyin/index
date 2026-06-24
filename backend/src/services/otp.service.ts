@@ -3,23 +3,22 @@
  * Handles generation, validation, and rate limiting of OTPs
  */
 
-import crypto from 'crypto';
+import type { DbClient } from '../config/database';
 import userRepository from '../repositories/user.repository';
 import attemptRepository from '../repositories/attempt.repository';
 import emailService from './email.service';
 
-const OTP_EXPIRY_MINUTES = parseInt(process.env.OTP_EXPIRY_MINUTES || '10', 10);
-const MAX_OTP_GENERATION_PER_HOUR = parseInt(process.env.MAX_OTP_GENERATION_PER_HOUR || '5', 10);
-const MAX_OTP_VERIFICATION_ATTEMPTS = parseInt(process.env.MAX_OTP_VERIFICATION_ATTEMPTS || '5', 10);
+const DEFAULT_OTP_EXPIRY_MINUTES = 10;
+const DEFAULT_MAX_OTP_GENERATION_PER_HOUR = 5;
+const DEFAULT_MAX_OTP_VERIFICATION_ATTEMPTS = 5;
 
 export class OTPService {
   /**
    * Generate a high-entropy 6-digit OTP
    */
   private generateOTP(): string {
-    // Use crypto for high-entropy random number generation
-    const buffer = crypto.randomBytes(4);
-    const num = buffer.readUInt32BE(0);
+    // Use WebCrypto for high-entropy random number generation
+    const num = crypto.getRandomValues(new Uint32Array(1))[0];
     const otp = (num % 900000) + 100000; // Ensure 6 digits
     return otp.toString();
   }
@@ -27,11 +26,16 @@ export class OTPService {
   /**
    * Check if user has exceeded OTP generation rate limit
    */
-  async checkGenerationRateLimit(email: string, ip_address?: string): Promise<{ allowed: boolean; error?: string }> {
+  async checkGenerationRateLimit(
+    db: DbClient,
+    email: string,
+    ip_address?: string,
+    maxOtpGenerationPerHour: number = DEFAULT_MAX_OTP_GENERATION_PER_HOUR
+  ): Promise<{ allowed: boolean; error?: string }> {
     // Check email-based rate limit
-    const emailAttempts = await attemptRepository.getRecentOTPAttempts(email, 'generation', 60);
+    const emailAttempts = await attemptRepository.getRecentOTPAttempts(db, email, 'generation', 60);
 
-    if (emailAttempts.length >= MAX_OTP_GENERATION_PER_HOUR) {
+    if (emailAttempts.length >= maxOtpGenerationPerHour) {
       return {
         allowed: false,
         error: `Too many OTP requests. Please try again later.`,
@@ -40,9 +44,9 @@ export class OTPService {
 
     // Check IP-based rate limit (if IP is provided)
     if (ip_address) {
-      const ipAttempts = await attemptRepository.getRecentOTPAttemptsByIP(ip_address, 'generation', 60);
+      const ipAttempts = await attemptRepository.getRecentOTPAttemptsByIP(db, ip_address, 'generation', 60);
 
-      if (ipAttempts.length >= MAX_OTP_GENERATION_PER_HOUR * 2) {
+      if (ipAttempts.length >= maxOtpGenerationPerHour * 2) {
         // Allow more attempts per IP since multiple users might share the same IP
         return {
           allowed: false,
@@ -57,11 +61,16 @@ export class OTPService {
   /**
    * Check if user has exceeded OTP verification rate limit
    */
-  async checkVerificationRateLimit(email: string, ip_address?: string): Promise<{ allowed: boolean; error?: string }> {
+  async checkVerificationRateLimit(
+    db: DbClient,
+    email: string,
+    ip_address?: string,
+    maxOtpVerificationAttempts: number = DEFAULT_MAX_OTP_VERIFICATION_ATTEMPTS
+  ): Promise<{ allowed: boolean; error?: string }> {
     // Count failed verification attempts
-    const failedAttempts = await attemptRepository.countFailedOTPVerifications(email, 60);
+    const failedAttempts = await attemptRepository.countFailedOTPVerifications(db, email, 60);
 
-    if (failedAttempts >= MAX_OTP_VERIFICATION_ATTEMPTS) {
+    if (failedAttempts >= maxOtpVerificationAttempts) {
       return {
         allowed: false,
         error: `Too many failed OTP verification attempts. Please request a new OTP.`,
@@ -74,23 +83,29 @@ export class OTPService {
   /**
    * Generate and send OTP for email verification
    */
-  async generateAndSendOTP(email: string, ip_address?: string): Promise<{ message: string }> {
+  async generateAndSendOTP(
+    db: DbClient,
+    email: string,
+    ip_address?: string,
+    otpExpiryMinutes: number = DEFAULT_OTP_EXPIRY_MINUTES,
+    maxOtpGenerationPerHour: number = DEFAULT_MAX_OTP_GENERATION_PER_HOUR
+  ): Promise<{ message: string }> {
     // Check rate limits
-    const rateLimitCheck = await this.checkGenerationRateLimit(email, ip_address);
+    const rateLimitCheck = await this.checkGenerationRateLimit(db, email, ip_address, maxOtpGenerationPerHour);
     if (!rateLimitCheck.allowed) {
       // Log failed attempt
       if (ip_address) {
-        await attemptRepository.logOTPAttempt(email, ip_address, 'generation', false);
+        await attemptRepository.logOTPAttempt(db, email, ip_address, 'generation', false);
       }
       throw new Error(rateLimitCheck.error);
     }
 
     // Find user by email
-    const user = await userRepository.findByEmail(email);
+    const user = await userRepository.findByEmail(db, email);
     if (!user) {
       // Log failed attempt (don't reveal if email exists)
       if (ip_address) {
-        await attemptRepository.logOTPAttempt(email, ip_address, 'generation', false);
+        await attemptRepository.logOTPAttempt(db, email, ip_address, 'generation', false);
       }
       // Return success message anyway for security (don't reveal if email exists)
       return { message: 'If an account with that email exists, an OTP has been sent.' };
@@ -99,10 +114,10 @@ export class OTPService {
     // Generate OTP
     const otp = this.generateOTP();
     const otp_expires = new Date();
-    otp_expires.setMinutes(otp_expires.getMinutes() + OTP_EXPIRY_MINUTES);
+    otp_expires.setMinutes(otp_expires.getMinutes() + otpExpiryMinutes);
 
     // Save OTP to database
-    await userRepository.setEmailOTP(email, otp, otp_expires);
+    await userRepository.setEmailOTP(db, email, otp, otp_expires);
 
     // Send OTP email
     try {
@@ -110,7 +125,7 @@ export class OTPService {
 
       // Log successful attempt
       if (ip_address) {
-        await attemptRepository.logOTPAttempt(email, ip_address, 'generation', true);
+        await attemptRepository.logOTPAttempt(db, email, ip_address, 'generation', true);
       }
 
       return { message: 'OTP has been sent to your email.' };
@@ -119,7 +134,7 @@ export class OTPService {
 
       // Log failed attempt
       if (ip_address) {
-        await attemptRepository.logOTPAttempt(email, ip_address, 'generation', false);
+        await attemptRepository.logOTPAttempt(db, email, ip_address, 'generation', false);
       }
 
       throw new Error('Failed to send OTP email. Please try again.');
@@ -129,31 +144,37 @@ export class OTPService {
   /**
    * Verify OTP and activate account
    */
-  async verifyOTP(email: string, otp: string, ip_address?: string): Promise<{ message: string; user_id?: number }> {
+  async verifyOTP(
+    db: DbClient,
+    email: string,
+    otp: string,
+    ip_address?: string,
+    maxOtpVerificationAttempts: number = DEFAULT_MAX_OTP_VERIFICATION_ATTEMPTS
+  ): Promise<{ message: string; user_id?: number }> {
     // Check rate limits
-    const rateLimitCheck = await this.checkVerificationRateLimit(email, ip_address);
+    const rateLimitCheck = await this.checkVerificationRateLimit(db, email, ip_address, maxOtpVerificationAttempts);
     if (!rateLimitCheck.allowed) {
       throw new Error(rateLimitCheck.error);
     }
 
     // Verify OTP
-    const user = await userRepository.verifyEmailOTP(email, otp);
+    const user = await userRepository.verifyEmailOTP(db, email, otp);
 
     if (!user) {
       // Log failed attempt
       if (ip_address) {
-        await attemptRepository.logOTPAttempt(email, ip_address, 'verification', false);
+        await attemptRepository.logOTPAttempt(db, email, ip_address, 'verification', false);
       }
       throw new Error('Invalid or expired OTP');
     }
 
     // Clear OTP and activate account
-    await userRepository.clearEmailOTP(user.id);
-    await userRepository.activateAccount(user.id);
+    await userRepository.clearEmailOTP(db, user.id);
+    await userRepository.activateAccount(db, user.id);
 
     // Log successful attempt
     if (ip_address) {
-      await attemptRepository.logOTPAttempt(email, ip_address, 'verification', true);
+      await attemptRepository.logOTPAttempt(db, email, ip_address, 'verification', true);
     }
 
     return {
@@ -165,8 +186,14 @@ export class OTPService {
   /**
    * Resend OTP
    */
-  async resendOTP(email: string, ip_address?: string): Promise<{ message: string }> {
-    return await this.generateAndSendOTP(email, ip_address);
+  async resendOTP(
+    db: DbClient,
+    email: string,
+    ip_address?: string,
+    otpExpiryMinutes: number = DEFAULT_OTP_EXPIRY_MINUTES,
+    maxOtpGenerationPerHour: number = DEFAULT_MAX_OTP_GENERATION_PER_HOUR
+  ): Promise<{ message: string }> {
+    return await this.generateAndSendOTP(db, email, ip_address, otpExpiryMinutes, maxOtpGenerationPerHour);
   }
 }
 

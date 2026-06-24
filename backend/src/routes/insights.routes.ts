@@ -1,7 +1,8 @@
-import { Router } from 'express';
+import { Hono } from 'hono';
+import type { AppBindings } from '../types/env';
 import invoiceController from '../controllers/invoice.controller';
 
-const router = Router();
+const router = new Hono<AppBindings>();
 
 /**
  * @openapi
@@ -68,6 +69,6 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/', (req, res) => invoiceController.getMarketInsights(req, res));
+router.get('/', invoiceController.getMarketInsights);
 
 export default router;

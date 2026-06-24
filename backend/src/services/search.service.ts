@@ -1,4 +1,4 @@
-import pool from '../config/database';
+import type { DbClient } from '../config/database';
 
 /**
  * SearchService — rate-limited search logging.
@@ -17,8 +17,8 @@ export class SearchService {
    * Check whether the user has exceeded their hourly search quota.
    * Throws HTTP-like error if exceeded.
    */
-  async checkRateLimit(userId: number): Promise<void> {
-    const { rows } = await pool.query(
+  async checkRateLimit(db: DbClient, userId: number): Promise<void> {
+    const { rows } = await db.query(
       `SELECT COUNT(*)::int AS count
        FROM search_logs
        WHERE user_id = $1
@@ -38,11 +38,12 @@ export class SearchService {
    * Log a search action for audit and rate-limiting purposes.
    */
   async logSearch(
+    db: DbClient,
     userId: number,
     searchType: 'gstn' | 'mobile',
     searchValue: string
   ): Promise<void> {
-    await pool.query(
+    await db.query(
       `INSERT INTO search_logs (user_id, search_type, search_value, created_at)
        VALUES ($1, $2, $3, NOW())`,
       [userId, searchType, searchValue]
@@ -53,9 +54,10 @@ export class SearchService {
    * Return how many searches the user has remaining this hour.
    */
   async getRateLimitStatus(
+    db: DbClient,
     userId: number
   ): Promise<{ remaining: number; limit: number }> {
-    const { rows } = await pool.query(
+    const { rows } = await db.query(
       `SELECT COUNT(*)::int AS count
        FROM search_logs
        WHERE user_id = $1

@@ -1,273 +1,116 @@
-import { Response } from 'express';
-import { AuthRequest } from '../middleware/auth.middleware';
+import type { Context } from 'hono';
+import type { AppBindings } from '../types/env';
+import { createDbClient } from '../config/database';
 import moderationService from '../services/moderation.service';
 
 export class ModerationController {
-  /**
-   * @openapi
-   * /api/moderation/queue:
-   *   get:
-   *     tags: [Moderation]
-   *     summary: Get incidents pending moderation
-   *     security:
-   *       - bearerAuth: []
-   *     responses:
-   *       200:
-   *         description: Moderation queue
-   *       401:
-   *         description: Unauthorized
-   */
-  async getQueue(req: AuthRequest, res: Response): Promise<void> {
+  async getQueue(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      const incidents = await moderationService.getModerationQueue();
-      res.json({ incidents });
+      const incidents = await moderationService.getModerationQueue(db);
+      return c.json({ incidents });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      return c.json({ error: error.message }, 500);
     }
   }
 
-  /**
-   * @openapi
-   * /api/moderation/incidents/{id}/approve:
-   *   put:
-   *     tags: [Moderation]
-   *     summary: Approve an incident
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: integer
-   *     requestBody:
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             properties:
-   *               notes:
-   *                 type: string
-   *     responses:
-   *       200:
-   *         description: Incident approved
-   *       400:
-   *         description: Invalid state
-   *       404:
-   *         description: Not found
-   */
-  async approve(req: AuthRequest, res: Response): Promise<void> {
+  async approve(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Authentication required' }, 401);
       }
-      const id = parseInt(req.params.id, 10);
+      const id = parseInt(c.req.param('id')!, 10);
       if (isNaN(id)) {
-        res.status(400).json({ error: 'Invalid incident ID' });
-        return;
+        return c.json({ error: 'Invalid incident ID' }, 400);
       }
-      const { notes } = req.body;
-      const incident = await moderationService.approveIncident(id, req.user.id, notes);
-      res.json({ message: 'Incident approved', incident });
+      const { notes } = await c.req.json();
+      const incident = await moderationService.approveIncident(db, id, user.id, notes);
+      return c.json({ message: 'Incident approved', incident });
     } catch (error: any) {
       if (error.message === 'Incident not found') {
-        res.status(404).json({ error: error.message });
-        return;
+        return c.json({ error: error.message }, 404);
       }
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
-  /**
-   * @openapi
-   * /api/moderation/incidents/{id}/reject:
-   *   put:
-   *     tags: [Moderation]
-   *     summary: Reject an incident with reason
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: integer
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - reason
-   *             properties:
-   *               reason:
-   *                 type: string
-   *               notes:
-   *                 type: string
-   *     responses:
-   *       200:
-   *         description: Incident rejected
-   *       400:
-   *         description: Validation error
-   *       404:
-   *         description: Not found
-   */
-  async reject(req: AuthRequest, res: Response): Promise<void> {
+  async reject(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Authentication required' }, 401);
       }
-      const id = parseInt(req.params.id, 10);
+      const id = parseInt(c.req.param('id')!, 10);
       if (isNaN(id)) {
-        res.status(400).json({ error: 'Invalid incident ID' });
-        return;
+        return c.json({ error: 'Invalid incident ID' }, 400);
       }
-      const { reason, notes } = req.body;
+      const { reason, notes } = await c.req.json();
       if (!reason) {
-        res.status(400).json({ error: 'Rejection reason is required' });
-        return;
+        return c.json({ error: 'Rejection reason is required' }, 400);
       }
-      const incident = await moderationService.rejectIncident(id, req.user.id, reason, notes);
-      res.json({ message: 'Incident rejected', incident });
+      const incident = await moderationService.rejectIncident(db, id, user.id, reason, notes);
+      return c.json({ message: 'Incident rejected', incident });
     } catch (error: any) {
       if (error.message === 'Incident not found') {
-        res.status(404).json({ error: error.message });
-        return;
+        return c.json({ error: error.message }, 404);
       }
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
-  /**
-   * @openapi
-   * /api/moderation/incidents/{id}/penalty:
-   *   post:
-   *     tags: [Moderation]
-   *     summary: Add penalty to an incident
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: integer
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - penalty_amount
-   *               - penalty_reason
-   *             properties:
-   *               penalty_amount:
-   *                 type: number
-   *               currency_code:
-   *                 type: string
-   *               penalty_reason:
-   *                 type: string
-   *     responses:
-   *       201:
-   *         description: Penalty added
-   *       400:
-   *         description: Validation error
-   *       404:
-   *         description: Not found
-   */
-  async addPenalty(req: AuthRequest, res: Response): Promise<void> {
+  async addPenalty(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Authentication required' }, 401);
       }
-      const id = parseInt(req.params.id, 10);
+      const id = parseInt(c.req.param('id')!, 10);
       if (isNaN(id)) {
-        res.status(400).json({ error: 'Invalid incident ID' });
-        return;
+        return c.json({ error: 'Invalid incident ID' }, 400);
       }
-      const { penalty_amount, currency_code, penalty_reason } = req.body;
-      const penalty = await moderationService.addPenalty({
+      const { penalty_amount, currency_code, penalty_reason } = await c.req.json();
+      const penalty = await moderationService.addPenalty(db, {
         incident_id: id,
         penalty_amount,
         currency_code,
         penalty_reason,
-        imposed_by: req.user.id,
+        imposed_by: user.id,
       });
-      res.status(201).json({ message: 'Penalty added', penalty });
+      return c.json({ message: 'Penalty added', penalty }, 201);
     } catch (error: any) {
       if (error.message === 'Incident not found') {
-        res.status(404).json({ error: error.message });
-        return;
+        return c.json({ error: error.message }, 404);
       }
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
-  /**
-   * @openapi
-   * /api/incidents/{id}/respond:
-   *   post:
-   *     tags: [Incidents]
-   *     summary: Submit company response to an incident
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: integer
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - responder_gstn
-   *               - response_text
-   *             properties:
-   *               responder_gstn:
-   *                 type: string
-   *               responder_name:
-   *                 type: string
-   *               response_text:
-   *                 type: string
-   *     responses:
-   *       201:
-   *         description: Response submitted
-   *       400:
-   *         description: Validation error
-   */
-  async respondToIncident(req: AuthRequest, res: Response): Promise<void> {
+  async respondToIncident(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Authentication required' }, 401);
       }
-      const id = parseInt(req.params.id, 10);
+      const id = parseInt(c.req.param('id')!, 10);
       if (isNaN(id)) {
-        res.status(400).json({ error: 'Invalid incident ID' });
-        return;
+        return c.json({ error: 'Invalid incident ID' }, 400);
       }
-      const { responder_gstn, response_text, responder_name } = req.body;
+      const { responder_gstn, response_text, responder_name } = await c.req.json();
       if (!responder_gstn || !response_text) {
-        res.status(400).json({ error: 'responder_gstn and response_text are required' });
-        return;
+        return c.json({ error: 'responder_gstn and response_text are required' }, 400);
       }
-      const response = await moderationService.submitCompanyResponse(id, responder_gstn, response_text, responder_name);
-      res.status(201).json({ message: 'Response submitted', response });
+      const response = await moderationService.submitCompanyResponse(db, id, responder_gstn, response_text, responder_name);
+      return c.json({ message: 'Response submitted', response }, 201);
     } catch (error: any) {
       if (error.message === 'Incident not found') {
-        res.status(404).json({ error: error.message });
-        return;
+        return c.json({ error: error.message }, 404);
       }
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 }
