@@ -223,6 +223,12 @@ export const RBAC_POLICY: RBACPolicyEntry[] = [
   },
   {
     method: 'PUT',
+    path: '/api/incidents/:id/submit',
+    requiredLevel: 'verified',
+    middleware: 'apiLimiter + authMiddleware + requireMinTrustLevel(verified)',
+  },
+  {
+    method: 'PUT',
     path: '/api/incidents/:id',
     requiredLevel: 'new',
     middleware: 'apiLimiter + authMiddleware',

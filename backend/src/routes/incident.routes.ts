@@ -29,6 +29,8 @@ router.get('/company/:gstn', authMiddleware, incidentController.getByGstn);
 router.get('/:id', incidentController.getById);
 
 // Authenticated user routes for specific incident
+// Submit a draft incident for moderation review (owner only, drafts only)
+router.put('/:id/submit', authMiddleware, requireMinTrustLevel('verified'), incidentController.submitForReview);
 router.put('/:id', authMiddleware, incidentController.update);
 // Admins only: delete any incident (trust_level >= 4)
 router.delete('/:id', authMiddleware, requireMinTrustLevel('admin'), incidentController.delete);
