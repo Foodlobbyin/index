@@ -1,7 +1,8 @@
-import { Router, Request, Response } from 'express';
-import pool from '../config/database';
+import { Hono } from 'hono';
+import type { AppBindings } from '../types/env';
+import { createDbClient } from '../config/database';
 
-const router = Router();
+const router = new Hono<AppBindings>();
 
 /**
  * @openapi
@@ -41,12 +42,13 @@ const router = Router();
  *                 message:
  *                   type: string
  */
-router.get('/db', async (req: Request, res: Response) => {
+router.get('/db', async (c) => {
   try {
-    await pool.query('SELECT 1');
-    res.json({ status: 'ok', db: 'connected' });
-  } catch (error: any) {
-    res.status(500).json({ status: 'error', db: 'disconnected', message: error.message });
+    const db = createDbClient(c.env.DATABASE_URL);
+    await db.query('SELECT 1');
+    return c.json({ status: 'ok', database: 'connected' });
+  } catch (e) {
+    return c.json({ status: 'error', database: 'disconnected' }, 500);
   }
 });
 

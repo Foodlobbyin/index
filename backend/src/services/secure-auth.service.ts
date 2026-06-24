@@ -3,41 +3,50 @@
  * Secure registration with referral validation, GSTN verification, and OTP-based email verification
  */
 
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
-import pool from '../config/database';
+import bcrypt from 'bcryptjs';
+import { SignJWT, jwtVerify } from 'jose';
+import type { DbClient } from '../config/database';
 import userRepository from '../repositories/user.repository';
 import referralRepository from '../repositories/referral.repository';
 import attemptRepository from '../repositories/attempt.repository';
-import emailService from './email.service';
-import validationService from './validation.service';
-import referralService from './referral.service';
 import otpService from './otp.service';
 import captchaService from './captcha.service';
+import referralService from './referral.service';
+import validationService from './validation.service';
 import { UserCreateInput, UserLoginInput, EmailOTPLoginInput, UserResponse, VerifyOTPInput } from '../models/User';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const SALT_ROUNDS = 12; // Increased from 10 for better security
 
 export class SecureAuthService {
+  // Sign a JWT with the injected secret
+  private async signToken(payload: Record<string, any>, jwtSecret: string): Promise<string> {
+    const secret = new TextEncoder().encode(jwtSecret);
+    return await new SignJWT(payload)
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('7d')
+      .sign(secret);
+  }
+
   /**
    * Secure user registration with all validations
    */
   async register(
+    db: DbClient,
     userData: UserCreateInput,
     ip_address: string,
+    recaptchaSecretKey: string,
+    nodeEnv: string,
     user_agent?: string,
     captcha_token?: string
   ): Promise<{ message: string; requiresOTP: boolean }> {
-    const client = await pool.connect();
-
     try {
       // 1. Verify captcha (bot protection)
-      if (captchaService.shouldEnforceCaptcha() && captcha_token) {
-        const captchaResult = await captchaService.verifyRecaptcha(captcha_token, 'register');
+      if (captchaService.shouldEnforceCaptcha(nodeEnv, recaptchaSecretKey) && captcha_token) {
+        const captchaResult = await captchaService.verifyRecaptcha(captcha_token, recaptchaSecretKey, 'register');
         if (!captchaResult.isValid) {
           await attemptRepository.logRegistrationAttempt(
+            db,
             userData.email,
             userData.phone_number,
             ip_address,
@@ -54,9 +63,10 @@ export class SecureAuthService {
       await this.validateRegistrationData(userData);
 
       // 3. Validate referral code (required)
-      const referralValidation = await referralService.validateReferralCode(userData.referral_code, userData.email);
+      const referralValidation = await referralService.validateReferralCode(db, userData.referral_code, userData.email);
       if (!referralValidation.isValid) {
         await attemptRepository.logRegistrationAttempt(
+          db,
           userData.email,
           userData.phone_number,
           ip_address,
@@ -70,14 +80,15 @@ export class SecureAuthService {
 
       // 4. Check for existing users
       const [existingUsername, existingEmail, existingPhone, existingGSTN] = await Promise.all([
-        userRepository.findByUsername(userData.username),
-        userRepository.findByEmail(userData.email),
-        userRepository.findByPhoneNumber(userData.phone_number),
-        userData.gstn ? userRepository.findByGSTN(userData.gstn) : null,
+        userRepository.findByUsername(db, userData.username),
+        userRepository.findByEmail(db, userData.email),
+        userRepository.findByPhoneNumber(db, userData.phone_number),
+        userData.gstn ? userRepository.findByGSTN(db, userData.gstn) : null,
       ]);
 
       if (existingUsername) {
         await attemptRepository.logRegistrationAttempt(
+          db,
           userData.email,
           userData.phone_number,
           ip_address,
@@ -91,6 +102,7 @@ export class SecureAuthService {
 
       if (existingEmail) {
         await attemptRepository.logRegistrationAttempt(
+          db,
           userData.email,
           userData.phone_number,
           ip_address,
@@ -104,6 +116,7 @@ export class SecureAuthService {
 
       if (existingPhone) {
         await attemptRepository.logRegistrationAttempt(
+          db,
           userData.email,
           userData.phone_number,
           ip_address,
@@ -117,6 +130,7 @@ export class SecureAuthService {
 
       if (existingGSTN) {
         await attemptRepository.logRegistrationAttempt(
+          db,
           userData.email,
           userData.phone_number,
           ip_address,
@@ -131,39 +145,32 @@ export class SecureAuthService {
       // 5. Hash password
       const password_hash = await bcrypt.hash(userData.password, SALT_ROUNDS);
 
-      // 6. Start database transaction
-      await client.query('BEGIN');
+      // 6. Create user (account_activated = FALSE)
+      // NOTE: Neon HTTP driver has no transactions; run queries sequentially against db.
+      const user = await userRepository.createWithClient(db, {
+        username: userData.username,
+        phone_number: userData.phone_number,
+        email: userData.email,
+        password_hash,
+        first_name: userData.first_name,
+        last_name: userData.last_name,
+        gstn: userData.gstn,
+      });
 
-      // 7. Create user (account_activated = FALSE)
-      const user = await userRepository.createWithClient(
-        {
-          username: userData.username,
-          phone_number: userData.phone_number,
-          email: userData.email,
-          password_hash,
-          first_name: userData.first_name,
-          last_name: userData.last_name,
-          gstn: userData.gstn,
-        },
-        client
-      );
+      // 7. Increment referral used_count
+      await referralRepository.incrementUsedCount(db, userData.referral_code);
 
-      // 8. Increment referral used_count
-      await referralRepository.incrementUsedCount(userData.referral_code, client);
-
-      // 9. Commit transaction
-      await client.query('COMMIT');
-
-      // 10. Generate and send OTP for email verification
+      // 8. Generate and send OTP for email verification
       try {
-        await otpService.generateAndSendOTP(userData.email, ip_address);
+        await otpService.generateAndSendOTP(db, userData.email, ip_address);
       } catch (error: any) {
         console.error('Failed to send OTP:', error);
         // Don't fail registration if OTP sending fails
       }
 
-      // 11. Log successful registration attempt
+      // 9. Log successful registration attempt
       await attemptRepository.logRegistrationAttempt(
+        db,
         userData.email,
         userData.phone_number,
         ip_address,
@@ -178,12 +185,10 @@ export class SecureAuthService {
         requiresOTP: true,
       };
     } catch (error: any) {
-      // Rollback transaction on error
-      await client.query('ROLLBACK');
-
       // Log failed attempt if not already logged
       if (!error.message.includes('already exists') && !error.message.includes('Invalid referral')) {
         await attemptRepository.logRegistrationAttempt(
+          db,
           userData.email,
           userData.phone_number,
           ip_address,
@@ -195,8 +200,6 @@ export class SecureAuthService {
       }
 
       throw error;
-    } finally {
-      client.release();
     }
   }
 
@@ -247,28 +250,33 @@ export class SecureAuthService {
   /**
    * Verify OTP and activate account
    */
-  async verifyOTP(input: VerifyOTPInput, ip_address?: string): Promise<{ message: string; token: string; user: UserResponse }> {
+  async verifyOTP(
+    db: DbClient,
+    input: VerifyOTPInput,
+    jwtSecret: string,
+    recaptchaSecretKey: string,
+    nodeEnv: string,
+    ip_address?: string
+  ): Promise<{ message: string; token: string; user: UserResponse }> {
     // Verify captcha if provided
-    if (captchaService.shouldEnforceCaptcha() && input.captcha_token) {
-      const captchaResult = await captchaService.verifyRecaptcha(input.captcha_token, 'verify_otp');
+    if (captchaService.shouldEnforceCaptcha(nodeEnv, recaptchaSecretKey) && input.captcha_token) {
+      const captchaResult = await captchaService.verifyRecaptcha(input.captcha_token, recaptchaSecretKey, 'verify_otp');
       if (!captchaResult.isValid) {
         throw new Error(captchaResult.error || 'Captcha verification failed');
       }
     }
 
     // Verify OTP
-    const result = await otpService.verifyOTP(input.email, input.otp, ip_address);
+    const result = await otpService.verifyOTP(db, input.email, input.otp, ip_address);
 
     // Get user details
-    const user = await userRepository.findByEmail(input.email);
+    const user = await userRepository.findByEmail(db, input.email);
     if (!user) {
       throw new Error('User not found');
     }
 
     // Generate JWT token
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, {
-      expiresIn: '7d',
-    });
+    const token = await this.signToken({ id: user.id, username: user.username }, jwtSecret);
 
     // Return user without sensitive data
     const { password_hash, email_verification_token, password_reset_token, email_otp, ...userResponse } = user;
@@ -283,9 +291,9 @@ export class SecureAuthService {
   /**
    * Login with username and password
    */
-  async login(credentials: UserLoginInput): Promise<{ user: UserResponse; token: string }> {
+  async login(db: DbClient, credentials: UserLoginInput, jwtSecret: string): Promise<{ user: UserResponse; token: string }> {
     // Find user
-    const user = await userRepository.findByUsername(credentials.username);
+    const user = await userRepository.findByUsername(db, credentials.username);
     if (!user) {
       throw new Error('Invalid credentials');
     }
@@ -307,9 +315,7 @@ export class SecureAuthService {
     }
 
     // Generate token
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, {
-      expiresIn: '7d',
-    });
+    const token = await this.signToken({ id: user.id, username: user.username }, jwtSecret);
 
     // Return user without sensitive data
     const { password_hash, email_verification_token, password_reset_token, email_otp, ...userResponse } = user;
@@ -319,23 +325,30 @@ export class SecureAuthService {
   /**
    * Request OTP for existing user (resend OTP)
    */
-  async requestOTP(email: string, ip_address?: string, captcha_token?: string): Promise<{ message: string }> {
+  async requestOTP(
+    db: DbClient,
+    email: string,
+    recaptchaSecretKey: string,
+    nodeEnv: string,
+    ip_address?: string,
+    captcha_token?: string
+  ): Promise<{ message: string }> {
     // Verify captcha if provided
-    if (captchaService.shouldEnforceCaptcha() && captcha_token) {
-      const captchaResult = await captchaService.verifyRecaptcha(captcha_token, 'request_otp');
+    if (captchaService.shouldEnforceCaptcha(nodeEnv, recaptchaSecretKey) && captcha_token) {
+      const captchaResult = await captchaService.verifyRecaptcha(captcha_token, recaptchaSecretKey, 'request_otp');
       if (!captchaResult.isValid) {
         throw new Error(captchaResult.error || 'Captcha verification failed');
       }
     }
 
-    return await otpService.generateAndSendOTP(email, ip_address);
+    return await otpService.generateAndSendOTP(db, email, ip_address);
   }
 
   /**
    * Get user by ID
    */
-  async getUserById(id: number): Promise<UserResponse> {
-    const user = await userRepository.findById(id);
+  async getUserById(db: DbClient, id: number): Promise<UserResponse> {
+    const user = await userRepository.findById(db, id);
     if (!user) {
       throw new Error('User not found');
     }
@@ -345,9 +358,10 @@ export class SecureAuthService {
   /**
    * Verify JWT token
    */
-  verifyToken(token: string): any {
+  async verifyToken(token: string, jwtSecret: string): Promise<any> {
     try {
-      return jwt.verify(token, JWT_SECRET);
+      const { payload } = await jwtVerify(token, new TextEncoder().encode(jwtSecret));
+      return payload;
     } catch (error) {
       throw new Error('Invalid token');
     }

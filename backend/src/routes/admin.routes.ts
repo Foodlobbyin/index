@@ -1,10 +1,11 @@
-import { Router } from 'express';
+import { Hono } from 'hono';
+import type { AppBindings } from '../types/env';
 import adminController from '../controllers/admin.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { requireTrustLevel } from '../middleware/trustLevel.middleware';
 import { apiLimiter } from '../middleware/rateLimiter';
 
-const router = Router();
+const router = new Hono<AppBindings>();
 
 // Rate limiting + authentication on all admin routes
 router.use(apiLimiter);
@@ -18,7 +19,7 @@ router.use(authMiddleware);
 router.put(
   '/users/:id/trust-level',
   requireTrustLevel('admin'),
-  adminController.updateTrustLevel.bind(adminController)
+  adminController.updateTrustLevel
 );
 
 /**
@@ -29,7 +30,7 @@ router.put(
 router.get(
   '/users/promotion-candidates',
   requireTrustLevel('moderator', 'admin'),
-  adminController.getPromotionCandidates.bind(adminController)
+  adminController.getPromotionCandidates
 );
 
 export default router;

@@ -1,9 +1,12 @@
-import { Request, Response } from 'express';
+import type { Context } from 'hono';
+import type { AppBindings } from '../types/env';
+import { createDbClient } from '../config/database';
 import auditLogService from '../services/auditLog.service';
 
 class AuditLogController {
-  searchLogs = async (req: Request, res: Response): Promise<void> => {
+  searchLogs = async (c: Context<AppBindings>): Promise<Response> => {
     try {
+      const db = createDbClient(c.env.DATABASE_URL);
       const parseOptionalInt = (val: unknown): number | undefined => {
         if (val === undefined || val === '') return undefined;
         const n = parseInt(val as string, 10);
@@ -11,32 +14,32 @@ class AuditLogController {
       };
 
       const params = {
-        incident_id: parseOptionalInt(req.query.incident_id),
-        moderator_id: parseOptionalInt(req.query.moderator_id),
-        action: req.query.action as string | undefined,
-        date_from: req.query.date_from as string | undefined,
-        date_to: req.query.date_to as string | undefined,
-        page: parseOptionalInt(req.query.page),
-        limit: parseOptionalInt(req.query.limit),
+        incident_id: parseOptionalInt(c.req.query('incident_id')),
+        moderator_id: parseOptionalInt(c.req.query('moderator_id')),
+        action: c.req.query('action') as string | undefined,
+        date_from: c.req.query('date_from') as string | undefined,
+        date_to: c.req.query('date_to') as string | undefined,
+        page: parseOptionalInt(c.req.query('page')),
+        limit: parseOptionalInt(c.req.query('limit')),
       };
-      const result = await auditLogService.searchLogs(params);
-      res.json(result);
+      const result = await auditLogService.searchLogs(db, params);
+      return c.json(result);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      return c.json({ error: err.message }, 500);
     }
   };
 
-  getByIncident = async (req: Request, res: Response): Promise<void> => {
+  getByIncident = async (c: Context<AppBindings>): Promise<Response> => {
     try {
-      const id = parseInt(req.params.incidentId, 10);
+      const db = createDbClient(c.env.DATABASE_URL);
+      const id = parseInt(c.req.param('incidentId')!, 10);
       if (isNaN(id)) {
-        res.status(400).json({ error: 'Invalid incidentId' });
-        return;
+        return c.json({ error: 'Invalid incidentId' }, 400);
       }
-      const result = await auditLogService.getLogsByIncident(id);
-      res.json({ logs: result });
+      const result = await auditLogService.getLogsByIncident(db, id);
+      return c.json({ logs: result });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      return c.json({ error: err.message }, 500);
     }
   };
 }

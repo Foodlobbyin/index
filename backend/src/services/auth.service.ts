@@ -1,7 +1,7 @@
 /**
  * AuthService - JWT Token Strategy & Known Limitations
  * -------------------------------------------------------
- * Tokens: JWT (HS256), 7-day expiry, signed with JWT_SECRET env var.
+ * Tokens: JWT (HS256), 7-day expiry, signed with JWT_SECRET (injected).
  *
  * LIMITATIONS:
  *  1. No refresh-token mechanism - once issued, a token is valid for the full
@@ -22,20 +22,21 @@
  *    so that privilege de-escalation takes effect without waiting for expiry.
  */
 
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import { SignJWT, jwtVerify } from 'jose';
+import type { DbClient } from '../config/database';
 import userRepository from '../repositories/user.repository';
 import emailService from './email.service';
 import { UserCreateInputLegacy, UserLoginInput, EmailOTPLoginInput, UserResponse } from '../models/User';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const SALT_ROUNDS = 10;
 
 export class AuthService {
-  // Generate a random token
+  // Generate a random token (WebCrypto)
   private generateToken(): string {
-    return crypto.randomBytes(32).toString('hex');
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
   }
 
   // Generate a 6-digit OTP
@@ -43,20 +44,30 @@ export class AuthService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  async register(userData: UserCreateInputLegacy): Promise<{ user: UserResponse; token: string; message: string }> {
+  // Sign a JWT with the injected secret
+  private async signToken(payload: Record<string, any>, jwtSecret: string): Promise<string> {
+    const secret = new TextEncoder().encode(jwtSecret);
+    return await new SignJWT(payload)
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('7d')
+      .sign(secret);
+  }
+
+  async register(db: DbClient, userData: UserCreateInputLegacy, jwtSecret: string): Promise<{ user: UserResponse; token: string; message: string }> {
     // Check if user already exists
-    const existingUser = await userRepository.findByUsername(userData.username);
+    const existingUser = await userRepository.findByUsername(db, userData.username);
     if (existingUser) {
       throw new Error('Username already exists');
     }
 
-    const existingEmail = await userRepository.findByEmail(userData.email);
+    const existingEmail = await userRepository.findByEmail(db, userData.email);
     if (existingEmail) {
       throw new Error('Email already exists');
     }
 
     if (userData.mobile_number) {
-      const existingMobile = await userRepository.findByMobileNumber(userData.mobile_number);
+      const existingMobile = await userRepository.findByMobileNumber(db, userData.mobile_number);
       if (existingMobile) {
         throw new Error('Mobile number already exists');
       }
@@ -74,7 +85,7 @@ export class AuthService {
     }
 
     // Create user
-    const user = await userRepository.create({
+    const user = await userRepository.create(db, {
       username: userData.username,
       mobile_number: userData.mobile_number,
       email: userData.email,
@@ -94,20 +105,18 @@ export class AuthService {
     }
 
     // Generate JWT token
-    const token = jwt.sign({ id: user.id, username: user.username, trust_level: user.trust_level }, JWT_SECRET, {
-      expiresIn: '7d',
-    });
+    const token = await this.signToken({ id: user.id, username: user.username, trust_level: user.trust_level }, jwtSecret);
 
-    return { 
-      user, 
+    return {
+      user,
       token,
       message: 'Registration successful! Please check your email to verify your account.'
     };
   }
 
-  async login(credentials: UserLoginInput): Promise<{ user: UserResponse; token: string }> {
+  async login(db: DbClient, credentials: UserLoginInput, jwtSecret: string): Promise<{ user: UserResponse; token: string }> {
     // Find user
-    const user = await userRepository.findByUsername(credentials.username);
+    const user = await userRepository.findByUsername(db, credentials.username);
     if (!user) {
       throw new Error('Invalid credentials');
     }
@@ -124,27 +133,25 @@ export class AuthService {
     }
 
     // Generate token
-    const token = jwt.sign({ id: user.id, username: user.username, trust_level: user.trust_level }, JWT_SECRET, {
-      expiresIn: '7d',
-    });
+    const token = await this.signToken({ id: user.id, username: user.username, trust_level: user.trust_level }, jwtSecret);
 
     // Return user without sensitive data
     const { password_hash, email_verification_token, password_reset_token, email_otp, ...userResponse } = user;
     return { user: userResponse as UserResponse, token };
   }
 
-  async verifyEmail(token: string): Promise<{ message: string }> {
-    const user = await userRepository.findByVerificationToken(token);
+  async verifyEmail(db: DbClient, token: string): Promise<{ message: string }> {
+    const user = await userRepository.findByVerificationToken(db, token);
     if (!user) {
       throw new Error('Invalid or expired verification token');
     }
 
-    await userRepository.verifyEmail(user.id);
+    await userRepository.verifyEmail(db, user.id);
     return { message: 'Email verified successfully!' };
   }
 
-  async requestPasswordReset(email: string): Promise<{ message: string }> {
-    const user = await userRepository.findByEmail(email);
+  async requestPasswordReset(db: DbClient, email: string): Promise<{ message: string }> {
+    const user = await userRepository.findByEmail(db, email);
     if (!user) {
       // Don't reveal if email exists or not for security
       return { message: 'If an account with that email exists, a password reset link has been sent.' };
@@ -155,7 +162,7 @@ export class AuthService {
     const resetExpires = new Date();
     resetExpires.setHours(resetExpires.getHours() + 1); // 1 hour
 
-    await userRepository.setPasswordResetToken(user.id, resetToken, resetExpires);
+    await userRepository.setPasswordResetToken(db, user.id, resetToken, resetExpires);
 
     // Send reset email
     try {
@@ -168,20 +175,20 @@ export class AuthService {
     return { message: 'If an account with that email exists, a password reset link has been sent.' };
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
-    const user = await userRepository.findByPasswordResetToken(token);
+  async resetPassword(db: DbClient, token: string, newPassword: string): Promise<{ message: string }> {
+    const user = await userRepository.findByPasswordResetToken(db, token);
     if (!user) {
       throw new Error('Invalid or expired password reset token');
     }
 
     const password_hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    await userRepository.updatePassword(user.id, password_hash);
+    await userRepository.updatePassword(db, user.id, password_hash);
 
     return { message: 'Password reset successfully! You can now login with your new password.' };
   }
 
-  async requestEmailOTP(email: string): Promise<{ message: string }> {
-    const user = await userRepository.findByEmail(email);
+  async requestEmailOTP(db: DbClient, email: string): Promise<{ message: string }> {
+    const user = await userRepository.findByEmail(db, email);
     if (!user) {
       // Don't reveal if email exists or not for security
       return { message: 'If an account with that email exists, an OTP has been sent.' };
@@ -192,7 +199,7 @@ export class AuthService {
     const otpExpires = new Date();
     otpExpires.setMinutes(otpExpires.getMinutes() + 10); // 10 minutes
 
-    await userRepository.setEmailOTP(email, otp, otpExpires);
+    await userRepository.setEmailOTP(db, email, otp, otpExpires);
 
     // Send OTP email
     try {
@@ -205,36 +212,35 @@ export class AuthService {
     return { message: 'If an account with that email exists, an OTP has been sent.' };
   }
 
-  async loginWithEmailOTP(credentials: EmailOTPLoginInput): Promise<{ user: UserResponse; token: string }> {
-    const user = await userRepository.verifyEmailOTP(credentials.email, credentials.otp);
+  async loginWithEmailOTP(db: DbClient, credentials: EmailOTPLoginInput, jwtSecret: string): Promise<{ user: UserResponse; token: string }> {
+    const user = await userRepository.verifyEmailOTP(db, credentials.email, credentials.otp);
     if (!user) {
       throw new Error('Invalid or expired OTP');
     }
 
     // Clear OTP
-    await userRepository.clearEmailOTP(user.id);
+    await userRepository.clearEmailOTP(db, user.id);
 
     // Generate JWT token
-    const token = jwt.sign({ id: user.id, username: user.username, trust_level: user.trust_level }, JWT_SECRET, {
-      expiresIn: '7d',
-    });
+    const token = await this.signToken({ id: user.id, username: user.username, trust_level: user.trust_level }, jwtSecret);
 
     // Return user without sensitive data
     const { password_hash, email_verification_token, password_reset_token, email_otp, ...userResponse } = user;
     return { user: userResponse as UserResponse, token };
   }
 
-  async getUserById(id: number): Promise<UserResponse> {
-    const user = await userRepository.findById(id);
+  async getUserById(db: DbClient, id: number): Promise<UserResponse> {
+    const user = await userRepository.findById(db, id);
     if (!user) {
       throw new Error('User not found');
     }
     return user;
   }
 
-  verifyToken(token: string): any {
+  async verifyToken(token: string, jwtSecret: string): Promise<any> {
     try {
-      return jwt.verify(token, JWT_SECRET);
+      const { payload } = await jwtVerify(token, new TextEncoder().encode(jwtSecret));
+      return payload;
     } catch (error) {
       throw new Error('Invalid token');
     }

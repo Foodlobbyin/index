@@ -3,12 +3,13 @@
  * API endpoints for referral code management
  */
 
-import { Router } from 'express';
+import { Hono } from 'hono';
+import type { AppBindings } from '../types/env';
 import referralController from '../controllers/referral.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { createRateLimiter, authRateLimiter } from '../middleware/rateLimiter';
 
-const router = Router();
+const router = new Hono<AppBindings>();
 
 // Rate limiters
 const referralRateLimiter = createRateLimiter(10, 15); // 10 requests per 15 minutes

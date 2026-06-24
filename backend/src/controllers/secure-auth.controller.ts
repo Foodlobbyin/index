@@ -3,17 +3,19 @@
  * Handles HTTP requests for secure authentication with referral-based registration
  */
 
-import { Response } from 'express';
+import type { Context } from 'hono';
+import type { AppBindings } from '../types/env';
+import { createDbClient } from '../config/database';
 import secureAuthService from '../services/secure-auth.service';
 import auditLogService from '../services/auditLog.service';
-import { AuthRequest } from '../middleware/auth.middleware';
 
 export class SecureAuthController {
   /**
    * Register a new user with referral code
    * POST /api/auth/register
    */
-  async register(req: AuthRequest, res: Response): Promise<void> {
+  async register(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
       const {
         username,
@@ -26,49 +28,44 @@ export class SecureAuthController {
         gstn,
         referral_code,
         captcha_token,
-      } = req.body;
+      } = await c.req.json();
 
       // Get IP address and user agent
-      const ip_address = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
-      const user_agent = req.headers['user-agent'];
+      const ip_address =
+        c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown';
+      const user_agent = c.req.header('user-agent');
 
       // Validate required fields
       if (!username) {
-        res.status(400).json({ error: 'Username is required' });
-        return;
+        return c.json({ error: 'Username is required' }, 400);
       }
 
       if (!phone_number) {
-        res.status(400).json({ error: 'Phone number is required' });
-        return;
+        return c.json({ error: 'Phone number is required' }, 400);
       }
 
       if (!email) {
-        res.status(400).json({ error: 'Email is required' });
-        return;
+        return c.json({ error: 'Email is required' }, 400);
       }
 
       if (!password) {
-        res.status(400).json({ error: 'Password is required' });
-        return;
+        return c.json({ error: 'Password is required' }, 400);
       }
 
       if (!confirm_password) {
-        res.status(400).json({ error: 'Confirm password is required' });
-        return;
+        return c.json({ error: 'Confirm password is required' }, 400);
       }
 
       if (!gstn) {
-        res.status(400).json({ error: 'GSTN is required' });
-        return;
+        return c.json({ error: 'GSTN is required' }, 400);
       }
 
       if (!referral_code) {
-        res.status(400).json({ error: 'Referral code is required' });
-        return;
+        return c.json({ error: 'Referral code is required' }, 400);
       }
 
       const result = await secureAuthService.register(
+        db,
         {
           username,
           phone_number,
@@ -81,12 +78,14 @@ export class SecureAuthController {
           referral_code,
         },
         ip_address,
+        c.env.RECAPTCHA_SECRET_KEY,
+        c.env.NODE_ENV,
         user_agent,
         captcha_token
       );
 
       try {
-        await auditLogService.writeLog({
+        await auditLogService.writeLog(db, {
           action: 'user_registered',
           entity_type: 'user',
           details: { username, email, gstn },
@@ -94,9 +93,9 @@ export class SecureAuthController {
         });
       } catch { /* audit log failure must not break the main action */ }
 
-      res.status(201).json(result);
+      return c.json(result, 201);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
@@ -104,30 +103,34 @@ export class SecureAuthController {
    * Verify OTP and activate account
    * POST /api/auth/verify-otp
    */
-  async verifyOTP(req: AuthRequest, res: Response): Promise<void> {
+  async verifyOTP(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      const { email, otp, captcha_token } = req.body;
+      const { email, otp, captcha_token } = await c.req.json();
 
       if (!email) {
-        res.status(400).json({ error: 'Email is required' });
-        return;
+        return c.json({ error: 'Email is required' }, 400);
       }
 
       if (!otp) {
-        res.status(400).json({ error: 'OTP is required' });
-        return;
+        return c.json({ error: 'OTP is required' }, 400);
       }
 
       // Get IP address
-      const ip_address = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+      const ip_address =
+        c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown';
 
       const result = await secureAuthService.verifyOTP(
+        db,
         { email, otp, captcha_token },
+        c.env.JWT_SECRET,
+        c.env.RECAPTCHA_SECRET_KEY,
+        c.env.NODE_ENV,
         ip_address
       );
 
       try {
-        await auditLogService.writeLog({
+        await auditLogService.writeLog(db, {
           user_id: result.user.id,
           action: 'email_verified',
           entity_type: 'user',
@@ -137,9 +140,9 @@ export class SecureAuthController {
         });
       } catch { /* audit log failure must not break the main action */ }
 
-      res.status(200).json(result);
+      return c.json(result, 200);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
@@ -147,23 +150,31 @@ export class SecureAuthController {
    * Request OTP (for resend or new request)
    * POST /api/auth/request-otp
    */
-  async requestOTP(req: AuthRequest, res: Response): Promise<void> {
+  async requestOTP(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      const { email, captcha_token } = req.body;
+      const { email, captcha_token } = await c.req.json();
 
       if (!email) {
-        res.status(400).json({ error: 'Email is required' });
-        return;
+        return c.json({ error: 'Email is required' }, 400);
       }
 
       // Get IP address
-      const ip_address = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+      const ip_address =
+        c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown';
 
-      const result = await secureAuthService.requestOTP(email, ip_address, captcha_token);
+      const result = await secureAuthService.requestOTP(
+        db,
+        email,
+        c.env.RECAPTCHA_SECRET_KEY,
+        c.env.NODE_ENV,
+        ip_address,
+        captcha_token
+      );
 
-      res.status(200).json(result);
+      return c.json(result, 200);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
@@ -171,20 +182,23 @@ export class SecureAuthController {
    * Login with username and password
    * POST /api/auth/login
    */
-  async login(req: AuthRequest, res: Response): Promise<void> {
-    const ip_address = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+  async login(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
+    const ip_address =
+      c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown';
+    let body: any;
     try {
-      const { username, password } = req.body;
+      body = await c.req.json();
+      const { username, password } = body;
 
       if (!username || !password) {
-        res.status(400).json({ error: 'Username and password are required' });
-        return;
+        return c.json({ error: 'Username and password are required' }, 400);
       }
 
-      const result = await secureAuthService.login({ username, password });
+      const result = await secureAuthService.login(db, { username, password }, c.env.JWT_SECRET);
 
       try {
-        await auditLogService.writeLog({
+        await auditLogService.writeLog(db, {
           user_id: result.user.id,
           action: 'user_login',
           entity_type: 'user',
@@ -194,17 +208,17 @@ export class SecureAuthController {
         });
       } catch { /* audit log failure must not break the main action */ }
 
-      res.status(200).json(result);
+      return c.json(result, 200);
     } catch (error: any) {
       try {
-        await auditLogService.writeLog({
+        await auditLogService.writeLog(db, {
           action: 'user_login_failed',
           entity_type: 'user',
-          details: { username: req.body?.username, reason: error.message },
+          details: { username: body?.username, reason: error.message },
           ip_address,
         });
       } catch { /* audit log failure must not break the main action */ }
-      res.status(401).json({ error: error.message });
+      return c.json({ error: error.message }, 401);
     }
   }
 
@@ -212,18 +226,19 @@ export class SecureAuthController {
    * Get user profile
    * GET /api/auth/profile
    */
-  async getProfile(req: AuthRequest, res: Response): Promise<void> {
+  async getProfile(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const user = await secureAuthService.getUserById(req.user.id);
+      const result = await secureAuthService.getUserById(db, user.id);
 
-      res.status(200).json({ user });
+      return c.json({ user: result }, 200);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 }

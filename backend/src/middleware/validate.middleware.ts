@@ -1,20 +1,29 @@
-import { Request, Response, NextFunction } from 'express';
+import type { Context, MiddlewareHandler } from 'hono';
 import { z, ZodSchema } from 'zod';
+import type { AppBindings } from '../types/env';
 
 /**
  * Generic validation middleware factory.
- * Validates req.body against the provided Zod schema and returns 400 on failure.
+ * Validates the JSON request body against the provided Zod schema and returns 400 on failure.
+ * On success the parsed data is stored on the context via `c.set('validatedBody', ...)`.
  */
-export const validate = (schema: ZodSchema) =>
-  (req: Request, res: Response, next: NextFunction): void => {
-    const result = schema.safeParse(req.body);
+export const validate = (schema: ZodSchema): MiddlewareHandler<AppBindings> =>
+  async (c: Context<AppBindings>, next) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      body = undefined;
+    }
+
+    const result = schema.safeParse(body);
     if (!result.success) {
       const firstError = result.error.errors[0];
-      res.status(400).json({ error: firstError?.message ?? 'Validation error' });
-      return;
+      return c.json({ error: firstError?.message ?? 'Validation error' }, 400);
     }
-    req.body = result.data;
-    next();
+
+    c.set('validatedBody', result.data);
+    await next();
   };
 
 // ─── Auth schemas ────────────────────────────────────────────────────────────

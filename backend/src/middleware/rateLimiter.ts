@@ -1,53 +1,61 @@
-import rateLimit from 'express-rate-limit';
+import type { Context, MiddlewareHandler } from 'hono';
+import type { AppBindings } from '../types/env';
 
-// General API rate limiter
-export const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+/**
+ * Resolve the client IP from Cloudflare / proxy headers.
+ */
+const getClientIp = (c: Context<AppBindings>): string =>
+  c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
 
-// Stricter rate limiter for authentication endpoints (register/login)
-export const authRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
-  message: 'Too many authentication attempts, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-  skipSuccessfulRequests: false,
-});
+/**
+ * KV-based fixed-window rate limiter factory.
+ * Counts requests per client IP within a 1-minute window using `c.env.RATE_LIMIT_KV`.
+ *
+ * @param limit Maximum number of requests allowed per minute.
+ * @param _windowMinutes Accepted for backward compatibility with the previous
+ *   `express-rate-limit` signature; the window is fixed at 1 minute in the KV implementation.
+ */
+export const createRateLimiter = (
+  limit: number,
+  _windowMinutes?: number
+): MiddlewareHandler<AppBindings> =>
+  async (c: Context<AppBindings>, next) => {
+    const ip = getClientIp(c);
+    const key = `rate:${ip}:${Math.floor(Date.now() / 60000)}`;
 
-// Rate limiter for OTP endpoints (generation and verification)
-export const otpRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 OTP requests per 15 minutes
-  message: 'Too many OTP requests, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+    const raw = await c.env.RATE_LIMIT_KV.get(key);
+    const count = raw ? parseInt(raw, 10) || 0 : 0;
 
-// Rate limiter for data modification endpoints
-export const createLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 10, // Limit each IP to 10 create requests per minute
-  message: 'Too many create requests, please slow down.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+    if (count >= limit) {
+      return c.json({ error: 'Too many requests, please try again later.' }, 429);
+    }
 
-// Helper function to create custom rate limiters
-export const createRateLimiter = (max: number, windowMinutes: number) => {
-  return rateLimit({
-    windowMs: windowMinutes * 60 * 1000,
-    max,
-    message: `Too many requests, please try again after ${windowMinutes} minutes.`,
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
+    await c.env.RATE_LIMIT_KV.put(key, String(count + 1), { expirationTtl: 60 });
+    await next();
+  };
+
+/**
+ * General API rate limiter. Uses the configured `RATE_LIMIT_MAX` (default 100) per minute.
+ */
+export const apiLimiter: MiddlewareHandler<AppBindings> = async (c, next) => {
+  const limit = parseInt(c.env.RATE_LIMIT_MAX, 10) || 100;
+  return createRateLimiter(limit)(c, next);
 };
 
-// Keep legacy exports for backward compatibility
-export const authLimiter = authRateLimiter;
+/**
+ * Stricter rate limiter for authentication endpoints (register/login).
+ */
+export const authRateLimiter = createRateLimiter(5);
 
+/**
+ * Rate limiter for OTP endpoints (generation and verification).
+ */
+export const otpRateLimiter = createRateLimiter(10);
+
+/**
+ * Rate limiter for data modification (create) endpoints.
+ */
+export const createLimiter = createRateLimiter(10);
+
+// Keep legacy export for backward compatibility
+export const authLimiter = authRateLimiter;

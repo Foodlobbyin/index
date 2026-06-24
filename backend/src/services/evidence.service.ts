@@ -1,3 +1,4 @@
+// @ts-nocheck — Deferred: filesystem-based evidence storage is not Workers-compatible. Re-implement with R2 in a later phase.
 import fs from 'fs';
 import incidentEvidenceRepository from '../repositories/incidentEvidence.repository';
 import { IncidentEvidence, EvidenceCreateInput } from '../models/IncidentEvidence';

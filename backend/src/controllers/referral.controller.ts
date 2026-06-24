@@ -3,47 +3,48 @@
  * Handles HTTP requests for referral code management
  */
 
-import { Response } from 'express';
+import type { Context } from 'hono';
+import type { AppBindings } from '../types/env';
+import { createDbClient } from '../config/database';
 import referralService from '../services/referral.service';
-import { AuthRequest } from '../middleware/auth.middleware';
 
 export class ReferralController {
   /**
    * Create a new referral code
    * POST /api/referrals
    */
-  async createReferral(req: AuthRequest, res: Response): Promise<void> {
+  async createReferral(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const { max_uses, expires_at, allowed_email_domain } = req.body;
+      const { max_uses, expires_at, allowed_email_domain } = await c.req.json();
 
       // Parse expires_at if provided
       let expiresDate: Date | undefined;
       if (expires_at) {
         expiresDate = new Date(expires_at);
         if (isNaN(expiresDate.getTime())) {
-          res.status(400).json({ error: 'Invalid expires_at date format' });
-          return;
+          return c.json({ error: 'Invalid expires_at date format' }, 400);
         }
       }
 
-      const referral = await referralService.createReferralCode({
-        created_by_user_id: req.user.id,
+      const referral = await referralService.createReferralCode(db, {
+        created_by_user_id: user.id,
         max_uses: max_uses ? parseInt(max_uses, 10) : undefined,
         expires_at: expiresDate,
         allowed_email_domain,
       });
 
-      res.status(201).json({
+      return c.json({
         message: 'Referral code created successfully',
         referral,
-      });
+      }, 201);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
@@ -51,18 +52,19 @@ export class ReferralController {
    * Get all referrals created by the current user
    * GET /api/referrals/my-referrals
    */
-  async getMyReferrals(req: AuthRequest, res: Response): Promise<void> {
+  async getMyReferrals(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const referrals = await referralService.getUserReferrals(req.user.id);
+      const referrals = await referralService.getUserReferrals(db, user.id);
 
-      res.status(200).json({ referrals });
+      return c.json({ referrals }, 200);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
@@ -70,20 +72,20 @@ export class ReferralController {
    * Get referral usage statistics
    * GET /api/referrals/:code/stats
    */
-  async getReferralStats(req: AuthRequest, res: Response): Promise<void> {
+  async getReferralStats(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      const { code } = req.params;
+      const code = c.req.param('code');
 
       if (!code) {
-        res.status(400).json({ error: 'Referral code is required' });
-        return;
+        return c.json({ error: 'Referral code is required' }, 400);
       }
 
-      const stats = await referralService.getReferralStats(code);
+      const stats = await referralService.getReferralStats(db, code);
 
-      res.status(200).json({ stats });
+      return c.json({ stats }, 200);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
@@ -91,25 +93,25 @@ export class ReferralController {
    * Deactivate a referral code
    * PATCH /api/referrals/:referralId/deactivate
    */
-  async deactivateReferral(req: AuthRequest, res: Response): Promise<void> {
+  async deactivateReferral(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const { referralId } = req.params;
+      const referralId = c.req.param('referralId');
 
       if (!referralId) {
-        res.status(400).json({ error: 'Referral ID is required' });
-        return;
+        return c.json({ error: 'Referral ID is required' }, 400);
       }
 
-      const result = await referralService.deactivateReferral(parseInt(referralId, 10), req.user.id);
+      const result = await referralService.deactivateReferral(db, parseInt(referralId, 10), user.id);
 
-      res.status(200).json(result);
+      return c.json(result, 200);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
@@ -117,25 +119,25 @@ export class ReferralController {
    * Activate a referral code
    * PATCH /api/referrals/:referralId/activate
    */
-  async activateReferral(req: AuthRequest, res: Response): Promise<void> {
+  async activateReferral(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const { referralId } = req.params;
+      const referralId = c.req.param('referralId');
 
       if (!referralId) {
-        res.status(400).json({ error: 'Referral ID is required' });
-        return;
+        return c.json({ error: 'Referral ID is required' }, 400);
       }
 
-      const result = await referralService.activateReferral(parseInt(referralId, 10), req.user.id);
+      const result = await referralService.activateReferral(db, parseInt(referralId, 10), user.id);
 
-      res.status(200).json(result);
+      return c.json(result, 200);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
@@ -143,30 +145,30 @@ export class ReferralController {
    * Validate a referral code (public endpoint for registration form)
    * POST /api/referrals/validate
    */
-  async validateReferral(req: AuthRequest, res: Response): Promise<void> {
+  async validateReferral(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      const { code, email } = req.body;
+      const { code, email } = await c.req.json();
 
       if (!code || !email) {
-        res.status(400).json({ error: 'Referral code and email are required' });
-        return;
+        return c.json({ error: 'Referral code and email are required' }, 400);
       }
 
-      const validation = await referralService.validateReferralCode(code, email);
+      const validation = await referralService.validateReferralCode(db, code, email);
 
       if (validation.isValid) {
-        res.status(200).json({
+        return c.json({
           valid: true,
           message: 'Referral code is valid',
-        });
+        }, 200);
       } else {
-        res.status(400).json({
+        return c.json({
           valid: false,
           error: validation.error,
-        });
+        }, 400);
       }
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 }

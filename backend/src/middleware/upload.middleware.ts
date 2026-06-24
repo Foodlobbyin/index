@@ -1,3 +1,4 @@
+// @ts-nocheck — Deferred: multer-based upload is not Workers-compatible. Re-implement with R2/multipart in a later phase.
 import multer, { FileFilterCallback } from 'multer';
 import path from 'path';
 import fs from 'fs';

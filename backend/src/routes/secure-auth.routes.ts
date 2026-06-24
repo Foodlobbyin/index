@@ -3,7 +3,8 @@
  * API endpoints for secure authentication with referral-based registration
  */
 
-import { Router } from 'express';
+import { Hono } from 'hono';
+import type { AppBindings } from '../types/env';
 import secureAuthController from '../controllers/secure-auth.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { authRateLimiter, otpRateLimiter } from '../middleware/rateLimiter';
@@ -14,7 +15,7 @@ import {
   loginWithOTPSchema,
 } from '../middleware/validate.middleware';
 
-const router = Router();
+const router = new Hono<AppBindings>();
 
 /**
  * @openapi

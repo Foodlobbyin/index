@@ -3,7 +3,7 @@
  * Database operations for logging registration and OTP attempts
  */
 
-import pool from '../config/database';
+import type { DbClient } from '../config/database';
 import { RegistrationAttempt, OTPAttempt } from '../models/Attempt';
 
 export class AttemptRepository {
@@ -11,6 +11,7 @@ export class AttemptRepository {
    * Log a registration attempt
    */
   async logRegistrationAttempt(
+    db: DbClient,
     email: string,
     phone_number: string | undefined,
     ip_address: string,
@@ -41,13 +42,13 @@ export class AttemptRepository {
       user_agent || null,
     ];
 
-    await pool.query(query, values);
+    await db.query(query, values);
   }
 
   /**
    * Get recent registration attempts by email
    */
-  async getRecentRegistrationAttempts(email: string, minutes: number = 60): Promise<RegistrationAttempt[]> {
+  async getRecentRegistrationAttempts(db: DbClient, email: string, minutes: number = 60): Promise<RegistrationAttempt[]> {
     const query = `
       SELECT * FROM registration_attempts
       WHERE email = $1
@@ -55,14 +56,14 @@ export class AttemptRepository {
       ORDER BY created_at DESC
     `;
 
-    const result = await pool.query(query, [email]);
+    const result = await db.query(query, [email]);
     return result.rows;
   }
 
   /**
    * Get recent registration attempts by IP
    */
-  async getRecentRegistrationAttemptsByIP(ip_address: string, minutes: number = 60): Promise<RegistrationAttempt[]> {
+  async getRecentRegistrationAttemptsByIP(db: DbClient, ip_address: string, minutes: number = 60): Promise<RegistrationAttempt[]> {
     const query = `
       SELECT * FROM registration_attempts
       WHERE ip_address = $1
@@ -70,7 +71,7 @@ export class AttemptRepository {
       ORDER BY created_at DESC
     `;
 
-    const result = await pool.query(query, [ip_address]);
+    const result = await db.query(query, [ip_address]);
     return result.rows;
   }
 
@@ -78,6 +79,7 @@ export class AttemptRepository {
    * Log an OTP attempt
    */
   async logOTPAttempt(
+    db: DbClient,
     email: string,
     ip_address: string | undefined,
     attempt_type: 'generation' | 'verification',
@@ -94,13 +96,14 @@ export class AttemptRepository {
 
     const values = [email, ip_address || null, attempt_type, success];
 
-    await pool.query(query, values);
+    await db.query(query, values);
   }
 
   /**
    * Get recent OTP attempts by email
    */
   async getRecentOTPAttempts(
+    db: DbClient,
     email: string,
     attempt_type: 'generation' | 'verification',
     minutes: number = 60
@@ -113,7 +116,7 @@ export class AttemptRepository {
       ORDER BY created_at DESC
     `;
 
-    const result = await pool.query(query, [email, attempt_type]);
+    const result = await db.query(query, [email, attempt_type]);
     return result.rows;
   }
 
@@ -121,6 +124,7 @@ export class AttemptRepository {
    * Get recent OTP attempts by IP
    */
   async getRecentOTPAttemptsByIP(
+    db: DbClient,
     ip_address: string,
     attempt_type: 'generation' | 'verification',
     minutes: number = 60
@@ -133,14 +137,14 @@ export class AttemptRepository {
       ORDER BY created_at DESC
     `;
 
-    const result = await pool.query(query, [ip_address, attempt_type]);
+    const result = await db.query(query, [ip_address, attempt_type]);
     return result.rows;
   }
 
   /**
    * Count failed OTP verification attempts for an email in a time window
    */
-  async countFailedOTPVerifications(email: string, minutes: number = 60): Promise<number> {
+  async countFailedOTPVerifications(db: DbClient, email: string, minutes: number = 60): Promise<number> {
     const query = `
       SELECT COUNT(*) as count
       FROM otp_attempts
@@ -150,7 +154,7 @@ export class AttemptRepository {
       AND created_at > NOW() - INTERVAL '${minutes} minutes'
     `;
 
-    const result = await pool.query(query, [email]);
+    const result = await db.query(query, [email]);
     return parseInt(result.rows[0]?.count || '0', 10);
   }
 }

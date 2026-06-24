@@ -1,4 +1,4 @@
-import pool from '../config/database';
+import type { DbClient } from '../config/database';
 import { User, UserCreateInput, UserResponse } from '../models/User';
 
 export interface UserCreateData {
@@ -15,9 +15,9 @@ export interface UserCreateData {
 }
 
 export class UserRepository {
-  async create(user: UserCreateData): Promise<UserResponse> {
+  async create(db: DbClient, user: UserCreateData): Promise<UserResponse> {
     const { username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires } = user;
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO users (username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires, account_activated) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, FALSE) 
        RETURNING id, username, mobile_number, phone_number, email, first_name, last_name, gstn, email_verified, account_activated, trust_level, created_at`,
@@ -26,9 +26,9 @@ export class UserRepository {
     return result.rows[0];
   }
 
-  async createWithClient(user: UserCreateData, client: any): Promise<UserResponse> {
+  async createWithClient(db: DbClient, user: UserCreateData): Promise<UserResponse> {
     const { username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires } = user;
-    const result = await client.query(
+    const result = await db.query(
       `INSERT INTO users (username, mobile_number, phone_number, email, password_hash, first_name, last_name, gstn, email_verification_token, email_verification_expires, account_activated) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, FALSE) 
        RETURNING id, username, mobile_number, phone_number, email, first_name, last_name, gstn, email_verified, account_activated, trust_level, created_at`,
@@ -37,100 +37,100 @@ export class UserRepository {
     return result.rows[0];
   }
 
-  async findByUsername(username: string): Promise<User | null> {
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+  async findByUsername(db: DbClient, username: string): Promise<User | null> {
+    const result = await db.query('SELECT * FROM users WHERE username = $1', [username]);
     return result.rows[0] || null;
   }
 
-  async findByEmail(email: string): Promise<User | null> {
-    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+  async findByEmail(db: DbClient, email: string): Promise<User | null> {
+    const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
     return result.rows[0] || null;
   }
 
-  async findByMobileNumber(mobileNumber: string): Promise<User | null> {
-    const result = await pool.query('SELECT * FROM users WHERE mobile_number = $1', [mobileNumber]);
+  async findByMobileNumber(db: DbClient, mobileNumber: string): Promise<User | null> {
+    const result = await db.query('SELECT * FROM users WHERE mobile_number = $1', [mobileNumber]);
     return result.rows[0] || null;
   }
 
-  async findById(id: number): Promise<UserResponse | null> {
-    const result = await pool.query(
+  async findById(db: DbClient, id: number): Promise<UserResponse | null> {
+    const result = await db.query(
       'SELECT id, username, mobile_number, email, first_name, last_name, email_verified, trust_level, created_at FROM users WHERE id = $1',
       [id]
     );
     return result.rows[0] || null;
   }
 
-  async findByVerificationToken(token: string): Promise<User | null> {
-    const result = await pool.query(
+  async findByVerificationToken(db: DbClient, token: string): Promise<User | null> {
+    const result = await db.query(
       'SELECT * FROM users WHERE email_verification_token = $1 AND email_verification_expires > NOW()',
       [token]
     );
     return result.rows[0] || null;
   }
 
-  async verifyEmail(userId: number): Promise<void> {
-    await pool.query(
+  async verifyEmail(db: DbClient, userId: number): Promise<void> {
+    await db.query(
       'UPDATE users SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires = NULL WHERE id = $1',
       [userId]
     );
   }
 
-  async findByPasswordResetToken(token: string): Promise<User | null> {
-    const result = await pool.query(
+  async findByPasswordResetToken(db: DbClient, token: string): Promise<User | null> {
+    const result = await db.query(
       'SELECT * FROM users WHERE password_reset_token = $1 AND password_reset_expires > NOW()',
       [token]
     );
     return result.rows[0] || null;
   }
 
-  async setPasswordResetToken(userId: number, token: string, expires: Date): Promise<void> {
-    await pool.query(
+  async setPasswordResetToken(db: DbClient, userId: number, token: string, expires: Date): Promise<void> {
+    await db.query(
       'UPDATE users SET password_reset_token = $1, password_reset_expires = $2 WHERE id = $1',
       [token, expires, userId]
     );
   }
 
-  async updatePassword(userId: number, passwordHash: string): Promise<void> {
-    await pool.query(
+  async updatePassword(db: DbClient, userId: number, passwordHash: string): Promise<void> {
+    await db.query(
       'UPDATE users SET password_hash = $1, password_reset_token = NULL, password_reset_expires = NULL WHERE id = $2',
       [passwordHash, userId]
     );
   }
 
-  async setEmailOTP(email: string, otp: string, expires: Date): Promise<void> {
-    await pool.query(
+  async setEmailOTP(db: DbClient, email: string, otp: string, expires: Date): Promise<void> {
+    await db.query(
       'UPDATE users SET email_otp = $1, email_otp_expires = $2 WHERE email = $3',
       [otp, expires, email]
     );
   }
 
-  async verifyEmailOTP(email: string, otp: string): Promise<User | null> {
-    const result = await pool.query(
+  async verifyEmailOTP(db: DbClient, email: string, otp: string): Promise<User | null> {
+    const result = await db.query(
       'SELECT * FROM users WHERE email = $1 AND email_otp = $2 AND email_otp_expires > NOW()',
       [email, otp]
     );
     return result.rows[0] || null;
   }
 
-  async clearEmailOTP(userId: number): Promise<void> {
-    await pool.query(
+  async clearEmailOTP(db: DbClient, userId: number): Promise<void> {
+    await db.query(
       'UPDATE users SET email_otp = NULL, email_otp_expires = NULL WHERE id = $1',
       [userId]
     );
   }
 
-  async findByPhoneNumber(phoneNumber: string): Promise<User | null> {
-    const result = await pool.query('SELECT * FROM users WHERE phone_number = $1', [phoneNumber]);
+  async findByPhoneNumber(db: DbClient, phoneNumber: string): Promise<User | null> {
+    const result = await db.query('SELECT * FROM users WHERE phone_number = $1', [phoneNumber]);
     return result.rows[0] || null;
   }
 
-  async findByGSTN(gstn: string): Promise<User | null> {
-    const result = await pool.query('SELECT * FROM users WHERE gstn = $1', [gstn]);
+  async findByGSTN(db: DbClient, gstn: string): Promise<User | null> {
+    const result = await db.query('SELECT * FROM users WHERE gstn = $1', [gstn]);
     return result.rows[0] || null;
   }
 
-  async activateAccount(userId: number): Promise<void> {
-    await pool.query(
+  async activateAccount(db: DbClient, userId: number): Promise<void> {
+    await db.query(
       'UPDATE users SET account_activated = TRUE, email_verified = TRUE WHERE id = $1',
       [userId]
     );

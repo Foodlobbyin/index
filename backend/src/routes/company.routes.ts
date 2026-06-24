@@ -1,9 +1,10 @@
-import { Router } from 'express';
+import { Hono } from 'hono';
+import type { AppBindings } from '../types/env';
 import companyController from '../controllers/company.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { createLimiter } from '../middleware/rateLimiter';
 
-const router = Router();
+const router = new Hono<AppBindings>();
 
 // All routes require authentication
 router.use(authMiddleware);
@@ -86,7 +87,7 @@ router.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/', /* createLimiter */ (req, res) => companyController.createCompany(req, res));
+router.post('/', /* createLimiter */ companyController.createCompany);
 
 /**
  * @openapi
@@ -118,7 +119,7 @@ router.post('/', /* createLimiter */ (req, res) => companyController.createCompa
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/', (req, res) => companyController.getCompany(req, res));
+router.get('/', companyController.getCompany);
 
 /**
  * @openapi
@@ -202,7 +203,7 @@ router.get('/', (req, res) => companyController.getCompany(req, res));
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.put('/:id', (req, res) => companyController.updateCompany(req, res));
+router.put('/:id', companyController.updateCompany);
 
 /**
  * @openapi
@@ -251,6 +252,6 @@ router.put('/:id', (req, res) => companyController.updateCompany(req, res));
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.delete('/:id', (req, res) => companyController.deleteCompany(req, res));
+router.delete('/:id', companyController.deleteCompany);
 
 export default router;

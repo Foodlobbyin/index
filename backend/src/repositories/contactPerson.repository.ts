@@ -1,10 +1,10 @@
-import pool from '../config/database';
+import type { DbClient } from '../config/database';
 import { ContactPerson, ContactPersonCreateInput } from '../models/ContactPerson';
 
 export class ContactPersonRepository {
-  async create(data: ContactPersonCreateInput): Promise<ContactPerson> {
+  async create(db: DbClient, data: ContactPersonCreateInput): Promise<ContactPerson> {
     const { name, email, phone, company } = data;
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO contact_persons (name, email, phone, company)
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [name, email, phone ?? null, company ?? null]
@@ -12,8 +12,8 @@ export class ContactPersonRepository {
     return result.rows[0];
   }
 
-  async findById(id: number): Promise<ContactPerson | null> {
-    const result = await pool.query(
+  async findById(db: DbClient, id: number): Promise<ContactPerson | null> {
+    const result = await db.query(
       'SELECT * FROM contact_persons WHERE id = $1',
       [id]
     );
@@ -24,8 +24,8 @@ export class ContactPersonRepository {
    * Find all contact_persons rows that match the given phone number.
    * Returns every row — a person can be linked to multiple companies.
    */
-  async findByPhone(phone: string): Promise<ContactPerson[]> {
-    const result = await pool.query(
+  async findByPhone(db: DbClient, phone: string): Promise<ContactPerson[]> {
+    const result = await db.query(
       `SELECT * FROM contact_persons
        WHERE phone = $1
        ORDER BY created_at ASC`,
@@ -38,8 +38,8 @@ export class ContactPersonRepository {
    * Return the distinct company names associated with a phone number.
    * Filters out nulls and empty strings.
    */
-  async findCompaniesByPhone(phone: string): Promise<string[]> {
-    const result = await pool.query(
+  async findCompaniesByPhone(db: DbClient, phone: string): Promise<string[]> {
+    const result = await db.query(
       `SELECT DISTINCT company
        FROM contact_persons
        WHERE phone = $1
@@ -54,16 +54,16 @@ export class ContactPersonRepository {
   /**
    * @deprecated alias kept for call-sites that still use "mobile" terminology.
    */
-  async findCompaniesByMobile(mobile: string): Promise<string[]> {
-    return this.findCompaniesByPhone(mobile);
+  async findCompaniesByMobile(db: DbClient, mobile: string): Promise<string[]> {
+    return this.findCompaniesByPhone(db, mobile);
   }
 
-  async delete(id: number): Promise<boolean> {
-    const result = await pool.query(
-      'DELETE FROM contact_persons WHERE id = $1',
+  async delete(db: DbClient, id: number): Promise<boolean> {
+    const result = await db.query(
+      'DELETE FROM contact_persons WHERE id = $1 RETURNING id',
       [id]
     );
-    return (result.rowCount ?? 0) > 0;
+    return result.rows.length > 0;
   }
 }
 

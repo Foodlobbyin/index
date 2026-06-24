@@ -1,104 +1,113 @@
-import { Response } from 'express';
+import type { Context } from 'hono';
+import type { AppBindings } from '../types/env';
+import { createDbClient } from '../config/database';
 import companyService from '../services/company.service';
 import auditLogService from '../services/auditLog.service';
-import { AuthRequest } from '../middleware/auth.middleware';
 
 export class CompanyController {
-  async createCompany(req: AuthRequest, res: Response): Promise<void> {
+  async createCompany(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const company = await companyService.createCompany(req.user.id, req.body);
+      const body = await c.req.json();
+      const company = await companyService.createCompany(db, user.id, body);
 
       try {
-        await auditLogService.writeLog({
-          user_id: req.user.id,
+        await auditLogService.writeLog(db, {
+          user_id: user.id,
           action: 'company_profile_created',
           entity_type: 'company',
           entity_id: company.id,
           details: { company_name: company.company_name },
-          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+          ip_address:
+            c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown',
         });
       } catch { /* audit log failure must not break the main action */ }
 
-      res.status(201).json(company);
+      return c.json(company, 201);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
-  async getCompany(req: AuthRequest, res: Response): Promise<void> {
+  async getCompany(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const company = await companyService.getCompanyByUserId(req.user.id);
+      const company = await companyService.getCompanyByUserId(db, user.id);
       if (!company) {
-        res.status(404).json({ error: 'Company profile not found' });
-        return;
+        return c.json({ error: 'Company profile not found' }, 404);
       }
 
-      res.status(200).json(company);
+      return c.json(company, 200);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
-  async updateCompany(req: AuthRequest, res: Response): Promise<void> {
+  async updateCompany(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const companyId = parseInt(req.params.id);
-      const company = await companyService.updateCompany(companyId, req.body);
+      const companyId = parseInt(c.req.param('id')!);
+      const body = await c.req.json();
+      const company = await companyService.updateCompany(db, companyId, body);
 
       try {
-        await auditLogService.writeLog({
-          user_id: req.user.id,
+        await auditLogService.writeLog(db, {
+          user_id: user.id,
           action: 'company_profile_updated',
           entity_type: 'company',
           entity_id: companyId,
-          details: { updated_fields: Object.keys(req.body) },
-          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+          details: { updated_fields: Object.keys(body) },
+          ip_address:
+            c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown',
         });
       } catch { /* audit log failure must not break the main action */ }
 
-      res.status(200).json(company);
+      return c.json(company, 200);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 
-  async deleteCompany(req: AuthRequest, res: Response): Promise<void> {
+  async deleteCompany(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
     try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const companyId = parseInt(req.params.id);
-      await companyService.deleteCompany(companyId);
+      const companyId = parseInt(c.req.param('id')!);
+      await companyService.deleteCompany(db, companyId);
 
       try {
-        await auditLogService.writeLog({
-          user_id: req.user.id,
+        await auditLogService.writeLog(db, {
+          user_id: user.id,
           action: 'company_profile_deleted',
           entity_type: 'company',
           entity_id: companyId,
-          ip_address: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress,
+          ip_address:
+            c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown',
         });
       } catch { /* audit log failure must not break the main action */ }
 
-      res.status(204).send();
+      return c.body(null, 204);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      return c.json({ error: error.message }, 400);
     }
   }
 }
