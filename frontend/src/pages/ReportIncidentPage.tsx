@@ -118,7 +118,7 @@ const ReportIncidentPage: React.FC = () => {
   const goNext = () => {
     setError(null);
     // Step 2 validation — Description is mandatory
-    if (step === 2 && !formData.description.trim()) {
+    if (step === 2 && !(formData.description ?? '').trim()) {
       setError('Description is required. Please enter details about the incident in the Description field above.');
       return;
     }
