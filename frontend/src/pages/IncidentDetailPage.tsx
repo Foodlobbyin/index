@@ -55,6 +55,22 @@ const typeLabels: Record<string, string> = {
   PAYMENT_ISSUE: 'Payment Issue', CONTRACT_BREACH: 'Contract Breach', OTHER: 'Other',
 };
 
+// Category labels for company responses (mirrors MyDefaultsPage)
+const RESPONSE_CATEGORY_LABELS: Record<string, string> = {
+  quality_issue: 'Quality Issue',
+  short_delivery: 'Short / Wrong Delivery',
+  rate_dispute: 'Rate / Price Dispute',
+  commitment_breach: 'Commitment / Delivery Breach',
+  documentation_incomplete: 'Incomplete / Incorrect Documentation',
+  financial_hardship: 'Financial Hardship / Cash Flow',
+  legal_dispute: 'Under Legal Dispute / Arbitration',
+  already_paid: 'Already Paid — Proof Available',
+  force_majeure: 'Force Majeure',
+  mutual_negotiation: 'Mutual Negotiation Pending',
+  deduction_claim: 'Deduction / Claim Against Supplier',
+  other: 'Other',
+};
+
 function fmt(s: string | null | undefined) {
   if (!s) return '—';
   return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -453,6 +469,44 @@ export default function IncidentDetailPage(): JSX.Element {
       )}
       {incident.status === 'submitted' && <div className="bg-blue-50 border border-blue-200 rounded-2xl px-6 py-4"><p className="text-sm text-blue-700 font-medium">This report is awaiting moderation review.</p></div>}
       {incident.status === 'approved' && <div className="bg-green-50 border border-green-200 rounded-2xl px-6 py-4"><p className="text-sm text-green-700 font-medium">This report is verified and publicly visible.</p></div>}
+
+      {/* ── Company Response ─────────────────────────────────────────────── */}
+      {(incident as any).company_response && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-r from-green-700 to-green-600 px-6 py-4">
+            <p className="text-xs font-semibold text-green-200 uppercase tracking-widest mb-0.5">Company's Response</p>
+            <p className="text-sm text-white font-medium">The reported company has submitted their side of the story.</p>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            {/* Category chips */}
+            {((incident as any).company_response.default_categories ?? []).length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Reasons cited</p>
+                <div className="flex flex-wrap gap-2">
+                  {((incident as any).company_response.default_categories as string[]).map((catId) => (
+                    <span key={catId} className="px-2.5 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
+                      {RESPONSE_CATEGORY_LABELS[catId] ?? catId}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Response text */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Statement</p>
+              <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">
+                {(incident as any).company_response.response_text}
+              </p>
+            </div>
+            <p className="text-xs text-gray-400">
+              Submitted on {new Date((incident as any).company_response.responded_at).toLocaleDateString('en-IN', {
+                day: 'numeric', month: 'short', year: 'numeric',
+              })}
+            </p>
+          </div>
+        </div>
+      )}
+
       {isReporter && incident.status === 'draft' && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-6 py-4 flex items-center gap-3">
           <p className="text-sm text-gray-500 flex-1">This incident is still a draft.</p>
