@@ -80,13 +80,14 @@ router.get('/dashboard', async (c) => {
   const db = createDbClient(c.env.DATABASE_URL);
   try {
     const [incidentStats, monthlyIncidents, incidentByType] = await Promise.all([
-      // Total unique companies reported, total incidents, resolved count
+      // Total unique companies reported, total incidents, resolved count, this-month count
       db.query(`
         SELECT
           COUNT(*)::int                                                          AS total_incidents,
           COUNT(DISTINCT company_gstn)::int                                     AS total_companies,
           COUNT(*) FILTER (WHERE status = 'resolved')::int                      AS resolved_issues,
-          COUNT(*) FILTER (WHERE status IN ('approved','under_review','pending_review'))::int AS active_incidents
+          COUNT(*) FILTER (WHERE status IN ('approved','under_review','pending_review'))::int AS active_incidents,
+          COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('month', NOW()))::int AS cases_this_month
         FROM incidents
       `),
       // Incidents reported per month (last 6 months)
@@ -119,6 +120,7 @@ router.get('/dashboard', async (c) => {
       totalInvoices:    incidentStats.rows[0]?.total_incidents ?? 0,
       unpaidInvoices:   incidentStats.rows[0]?.active_incidents ?? 0,
       resolvedIssues:   incidentStats.rows[0]?.resolved_issues ?? 0,
+      casesThisMonth:   incidentStats.rows[0]?.cases_this_month ?? 0,
       invoicesByMonth:  monthlyIncidents.rows,
       invoicesByStatus: incidentByType.rows,
     });
@@ -137,13 +139,14 @@ router.get('/states', async (c) => {
   try {
     const result = await db.query(`
       SELECT
-        SUBSTRING(company_gstn, 1, 2)            AS state_code,
-        COUNT(*)::int                            AS incident_count,
-        COUNT(DISTINCT company_gstn)::int        AS company_count
+        SUBSTRING(company_gstn, 1, 2)              AS state_code,
+        COUNT(*)::int                              AS incident_count,
+        COUNT(DISTINCT company_gstn)::int          AS company_count,
+        COALESCE(SUM(amount_involved), 0)::float   AS unpaid_amount
       FROM incidents
       WHERE LENGTH(company_gstn) = 15
       GROUP BY state_code
-      ORDER BY incident_count DESC
+      ORDER BY unpaid_amount DESC
     `);
     return c.json({ states: result.rows });
   } catch (err: any) {
