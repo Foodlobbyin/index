@@ -3,18 +3,32 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: #2563eb;
-  --color-primary-dark: #1d4ed8;
-  --color-secondary: #64748b;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
-  --color-gray-50: #f9fafb;
-  --color-gray-100: #f3f4f6;
-  --color-gray-200: #e5e7eb;
-  --color-gray-300: #d1d5db;
-  --color-gray-700: #374151;
-  --color-gray-900: #111827;
+  /* FoodLobby brand palette — derived from logo */
+  --fl-forest:      #1C5C3A;   /* deep forest green — logo frame dark */
+  --fl-forest-dark: #0F3D25;   /* darkest green — hero gradient end */
+  --fl-forest-mid:  #2E7D52;   /* mid green — connector nodes */
+  --fl-sage:        #4A9E6B;   /* light facets */
+  --fl-gold:        #C8973B;   /* warm gold accent */
+  --fl-gold-light:  #E5B55A;   /* lighter gold for hover */
+  --fl-charcoal:    #1E2A24;   /* near-black with green undertone */
+  --fl-ink:         #2D3748;   /* logo wordmark gray */
+  --fl-bg-warm:     #F7F9F7;   /* warm off-white sections */
+  --fl-bg-sage:     #EEF4F0;   /* soft sage sections */
+  --fl-bg-mist:     #F0F5F1;   /* mist sections */
+
+  /* Legacy vars kept for app shell / non-homepage pages */
+  --color-primary:     #1C5C3A;
+  --color-primary-dark:#0F3D25;
+  --color-secondary:   #64748b;
+  --color-success:     #10b981;
+  --color-warning:     #C8973B;
+  --color-danger:      #ef4444;
+  --color-gray-50:     #f9fafb;
+  --color-gray-100:    #f3f4f6;
+  --color-gray-200:    #e5e7eb;
+  --color-gray-300:    #d1d5db;
+  --color-gray-700:    #374151;
+  --color-gray-900:    #111827;
 }
 
 * {
@@ -25,18 +39,23 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+    'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: var(--color-gray-900);
-  background-color: var(--color-gray-50);
+  color: var(--fl-charcoal);
+  background-color: var(--fl-bg-warm);
+}
+
+/* Elegant display headings use Playfair Display */
+.fl-heading {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
 h1 {
@@ -73,13 +92,13 @@ p {
 }
 
 a {
-  color: var(--color-primary);
+  color: var(--fl-forest);
   text-decoration: none;
   transition: color 0.2s;
 }
 
 a:hover {
-  color: var(--color-primary-dark);
+  color: var(--fl-forest-mid);
 }
 
 .container {
@@ -102,4 +121,93 @@ a:hover {
   .section {
     padding: 6rem 0;
   }
+}
+
+/* ── FoodLobby homepage utility classes ──────────────────────────── */
+
+.fl-btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--fl-gold);
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  padding: 0.875rem 2rem;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.15s;
+  letter-spacing: 0.01em;
+}
+.fl-btn-gold:hover {
+  background-color: var(--fl-gold-light);
+  transform: translateY(-1px);
+}
+
+.fl-btn-outline-white {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  padding: 0.875rem 2rem;
+  border-radius: 0.5rem;
+  border: 2px solid rgba(255,255,255,0.6);
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+  letter-spacing: 0.01em;
+}
+.fl-btn-outline-white:hover {
+  background-color: rgba(255,255,255,0.1);
+  border-color: #fff;
+}
+
+.fl-card {
+  background: #fff;
+  border-radius: 0.875rem;
+  border: 1px solid #D9EDE2;
+  padding: 1.75rem;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.fl-card:hover {
+  box-shadow: 0 8px 28px rgba(28, 92, 58, 0.1);
+  transform: translateY(-2px);
+}
+
+.fl-icon-box {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fl-step-circle {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--fl-forest), var(--fl-forest-mid));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0 auto 1.25rem;
+  box-shadow: 0 4px 14px rgba(28, 92, 58, 0.3);
+}
+
+.fl-divider {
+  width: 3.5rem;
+  height: 3px;
+  background: linear-gradient(90deg, var(--fl-gold), var(--fl-gold-light));
+  border-radius: 2px;
+  margin: 0 auto 1.5rem;
 }
