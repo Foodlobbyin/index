@@ -220,7 +220,12 @@ export class IncidentController {
    * GET /incidents/against-my-company
    * Returns all incidents filed against the authenticated user's company,
    * including their attached invoices and any existing company responses.
-   * Also returns { count } for the nav-visibility check.
+   * Also returns { count } for the nav-visibility check (kept for backward
+   * compat — the primary visibility signal is now has_incidents on companies).
+   *
+   * FIX (2026-06): was incorrectly reading gstn from company_profiles (no such
+   * column). Now reads from users.gstn — the authoritative GSTN store.
+   * Also auto-links companies.member_user_id if not yet set.
    */
   async againstMyCompany(c: Context<AppBindings>): Promise<Response> {
     const db = createDbClient(c.env.DATABASE_URL);
@@ -230,20 +235,40 @@ export class IncidentController {
         return c.json({ error: 'Authentication required' }, 401);
       }
 
-      // Look up the user's registered company GSTN
-      const companyResult = await db.query(
-        `SELECT gstn, company_name FROM company_profiles WHERE user_id = $1 LIMIT 1`,
+      // ── Step 1: Get GSTN from users table (the canonical source) ──────────
+      const userResult = await db.query(
+        `SELECT gstn FROM users WHERE id = $1`,
         [user.id]
       );
 
-      if (!companyResult.rows[0]?.gstn) {
+      const rawGstn = userResult.rows[0]?.gstn;
+      if (!rawGstn?.trim()) {
         return c.json({ count: 0, incidents: [], gstn: null });
       }
 
-      const gstn = companyResult.rows[0].gstn.trim().toUpperCase();
-      const companyName = companyResult.rows[0].company_name;
+      const gstn = rawGstn.trim().toUpperCase();
 
-      // Fetch all incidents where the reported company matches
+      // ── Step 2: Ensure companies row exists and member_user_id is linked ──
+      // This is a one-time self-healing write per user lifetime.
+      await db.query(
+        `UPDATE companies
+         SET
+           member_user_id      = $1,
+           is_registered_member = TRUE,
+           updated_at          = NOW()
+         WHERE gstn = $2
+           AND member_user_id IS NULL`,
+        [user.id, gstn]
+      );
+
+      // ── Step 3: Get company name from companies master table ───────────────
+      const companyRow = await db.query(
+        `SELECT id, company_name FROM companies WHERE gstn = $1 LIMIT 1`,
+        [gstn]
+      );
+      const companyName = companyRow.rows[0]?.company_name ?? null;
+
+      // ── Step 4: Fetch incidents against this GSTN ─────────────────────────
       const incidentsResult = await db.query(
         `SELECT
            i.id,
@@ -272,27 +297,25 @@ export class IncidentController {
 
       const incidentIds = incidents.map((inc: any) => inc.id);
 
-      // Fetch invoices attached to these incidents
+      // ── Step 5: Fetch invoices attached to these incidents ─────────────────
       const invoicesResult = await db.query(
         `SELECT
            inv.id,
            inv.incident_id,
            inv.invoice_number,
-           inv.amount,
-           inv.amount_unpaid,
-           inv.issue_date,
+           inv.invoice_amount,
+           inv.unpaid_amount,
+           inv.invoice_date,
            inv.due_date,
-           inv.status,
-           inv.category,
            inv.item_sold,
-           inv.description
-         FROM invoices inv
+           inv.currency_code
+         FROM incident_invoices inv
          WHERE inv.incident_id = ANY($1::int[])
-         ORDER BY inv.issue_date`,
+         ORDER BY inv.invoice_date`,
         [incidentIds]
       );
 
-      // Fetch existing company responses for these incidents
+      // ── Step 6: Fetch existing company responses ───────────────────────────
       const responsesResult = await db.query(
         `SELECT
            ir.id,
@@ -307,7 +330,7 @@ export class IncidentController {
         [incidentIds, gstn]
       );
 
-      // Group invoices and responses by incident_id
+      // ── Step 7: Group and enrich ───────────────────────────────────────────
       const invoicesByIncident: Record<number, any[]> = {};
       for (const inv of invoicesResult.rows) {
         if (!invoicesByIncident[inv.incident_id]) invoicesByIncident[inv.incident_id] = [];
@@ -315,7 +338,6 @@ export class IncidentController {
       }
       const responsesByIncident: Record<number, any> = {};
       for (const resp of responsesResult.rows) {
-        // Keep the most recent response per incident
         if (!responsesByIncident[resp.incident_id]) {
           responsesByIncident[resp.incident_id] = resp;
         }
