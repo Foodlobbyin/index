@@ -99,3 +99,32 @@ export function requireMinTrustLevel(minLevel: string): MiddlewareHandler<AppBin
     await next();
   };
 }
+/**
+ * Optional auth middleware. If a valid Bearer token is present, attaches the
+ * authenticated user to context (same as authMiddleware). If no token or invalid
+ * token is provided, simply continues without setting user — does NOT return 401.
+ * Use on public routes that should also serve enriched data to authenticated callers.
+ */
+export const optionalAuthMiddleware: MiddlewareHandler<AppBindings> = async (
+  c: Context<AppBindings>,
+  next
+) => {
+  const authHeader = c.req.header('Authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    try {
+      const secret = new TextEncoder().encode(c.env.JWT_SECRET);
+      const { payload } = await jwtVerify(token, secret);
+      const userId = (payload as { id: number }).id;
+      const username = (payload as { username: string }).username;
+      const db = createDbClient(c.env.DATABASE_URL);
+      const row = await db.query('SELECT trust_level FROM users WHERE id = $1', [userId]);
+      const trust_level: string = row.rows[0]?.trust_level ?? 'new';
+      c.set('user', { id: userId, username, trust_level });
+    } catch {
+      // Invalid token — continue as unauthenticated (do not 401)
+    }
+  }
+  await next();
+};
+
