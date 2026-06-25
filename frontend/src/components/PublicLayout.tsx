@@ -21,11 +21,15 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-green-700 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">F</span>
-              </div>
+              <img
+                src="/logo-mark.png"
+                alt="FoodLobby"
+                className="h-10 w-auto"
+              />
               <div>
-                <span className="text-xl font-bold text-gray-900">Foodlobby</span>
+                <span className="text-xl font-bold">
+                  <span style={{ fontWeight: 400, color: '#3d3d3d' }}>Food</span><span style={{ fontWeight: 700, color: '#3d3d3d' }}>Lobby</span>
+                </span>
                 <span className="hidden sm:block text-xs text-gray-500 leading-none -mt-0.5">
                   Trade Fraud Protection Network
                 </span>
@@ -105,7 +109,9 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-3 gap-8">
             <div>
-              <h3 className="text-lg font-semibold mb-3">Foodlobby</h3>
+              <h3 className="text-lg font-semibold mb-3">
+                <span style={{ fontWeight: 400 }}>Food</span><span style={{ fontWeight: 700 }}>Lobby</span>
+              </h3>
               <p className="text-gray-400 text-sm leading-relaxed">
                 A community-driven platform to report trade fraud, credit defaults, and
                 payment scams in India's food &amp; spice commodity sector.
@@ -144,7 +150,7 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
           </div>
           <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-500 text-sm">
             <p>
-              &copy; {new Date().getFullYear()} Foodlobby. All rights reserved.
+              &copy; {new Date().getFullYear()} FoodLobby. All rights reserved.
               &nbsp;&middot;&nbsp; Protecting India's food &amp; spice trade community.
             </p>
           </div>

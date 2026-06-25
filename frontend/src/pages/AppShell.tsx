@@ -83,10 +83,14 @@ const AppShell: React.FC = () => {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-2 shrink-0">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">F</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900">Foodlobbyin</span>
+              <img
+                src="/logo-mark.png"
+                alt="FoodLobby"
+                className="h-9 w-auto"
+              />
+              <span className="text-xl">
+                <span style={{ fontWeight: 400, color: '#3d3d3d' }}>Food</span><span style={{ fontWeight: 700, color: '#3d3d3d' }}>Lobby</span>
+              </span>
             </Link>
 
             {/* Nav links */}

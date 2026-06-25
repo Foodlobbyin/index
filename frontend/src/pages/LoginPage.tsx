@@ -81,9 +81,11 @@ export default function LoginPage(): JSX.Element {
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-3xl">F</span>
-            </div>
+            <img
+              src="/logo-mark.png"
+              alt="FoodLobby"
+              className="h-16 w-auto"
+            />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
           <p className="text-gray-600">Sign in to access your account</p>
