@@ -1,7 +1,22 @@
 import { useEffect, useState, useCallback } from 'react';
 import api from '../../services/api';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ─── Design tokens ────────────────────────────────────────────────────────────
+const T = {
+  bg:      '#F7F6F2',
+  surface: '#FFFFFF',
+  border:  '#E8E6E0',
+  text:    '#1A1917',
+  muted:   '#6B6966',
+  faint:   '#B5B3AE',
+  green:   '#15803d',
+  red:     '#DC2626',
+  blue:    '#2563EB',
+  amber:   '#D97706',
+  font:    `'Inter', 'DM Sans', system-ui, -apple-system, sans-serif`,
+};
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface PendingUser {
   id: number;
@@ -27,51 +42,65 @@ interface WaitlistEntry {
 }
 
 type ActiveTab = 'pending' | 'waitlist';
-
 const WAITLIST_STATUSES = ['waiting', 'invited', 'declined'];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-const badge = (label: string, color: string) => (
-  <span style={{
-    padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600,
-    backgroundColor: color + '20', color,
-  }}>
-    {label}
-  </span>
-);
-
 const WAITLIST_COLORS: Record<string, string> = {
-  waiting: '#f59e0b',
-  invited: '#3b82f6',
-  declined: '#ef4444',
-  registered: '#10b981',
+  waiting:    '#F59E0B',
+  invited:    '#3B82F6',
+  declined:   '#EF4444',
+  registered: '#10B981',
 };
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function Badge({ label, color }: { label: string; color: string }) {
+  return (
+    <span style={{
+      padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+      backgroundColor: color + '18', color,
+      fontFamily: T.font, letterSpacing: '0.02em',
+    }}>
+      {label}
+    </span>
+  );
+}
+
+function Toast({ msg, ok }: { msg: string; ok: boolean }) {
+  return (
+    <div style={{
+      position: 'fixed', top: 24, right: 24, zIndex: 9999,
+      padding: '12px 20px', borderRadius: 10, color: 'white', fontWeight: 500,
+      backgroundColor: ok ? '#16A34A' : '#DC2626',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+      fontSize: 13, fontFamily: T.font,
+    }}>
+      {msg}
+    </div>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function AdminQueue(): JSX.Element {
   const [activeTab, setActiveTab] = useState<ActiveTab>('pending');
-  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [toast, setToast]         = useState<{ msg: string; ok: boolean } | null>(null);
 
-  // Pending state
-  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
+  const [pendingUsers,  setPendingUsers]  = useState<PendingUser[]>([]);
   const [pendingLoading, setPendingLoading] = useState(true);
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingCount,  setPendingCount]  = useState(0);
 
-  // Waitlist state
-  const [entries, setEntries] = useState<WaitlistEntry[]>([]);
+  const [entries,        setEntries]       = useState<WaitlistEntry[]>([]);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [waitlistStatus, setWaitlistStatus] = useState('waiting');
   const [waitlistCounts, setWaitlistCounts] = useState<Record<string, number>>({});
-  const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [actionLoading,  setActionLoading] = useState<number | null>(null);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), 3200);
   };
 
-  // ── Pending loaders ───────────────────────────────────────────────────────
+  // ── Pending ───────────────────────────────────────────────────────────────
 
   const loadPending = useCallback(async () => {
     setPendingLoading(true);
@@ -80,143 +109,102 @@ export default function AdminQueue(): JSX.Element {
       const users = res.data.users || [];
       setPendingUsers(users);
       setPendingCount(users.length);
-    } catch {
-      showToast('Failed to load pending applications', false);
-    } finally {
-      setPendingLoading(false);
-    }
+    } catch { showToast('Failed to load pending applications', false); }
+    finally { setPendingLoading(false); }
   }, []);
 
   const approvePending = async (id: number) => {
     setActionLoading(id);
-    try {
-      await api.post(`/admin/approve/${id}`);
-      showToast('User approved and notified.');
-      loadPending();
-    } catch {
-      showToast('Failed to approve user', false);
-    } finally {
-      setActionLoading(null);
-    }
+    try { await api.post(`/admin/approve/${id}`); showToast('User approved and notified.'); loadPending(); }
+    catch { showToast('Failed to approve user', false); }
+    finally { setActionLoading(null); }
   };
 
   const declinePending = async (id: number) => {
     const reason = window.prompt('Reason for declining (optional):');
     setActionLoading(id);
-    try {
-      await api.post(`/admin/decline/${id}`, { reason });
-      showToast('User declined and notified.');
-      loadPending();
-    } catch {
-      showToast('Failed to decline user', false);
-    } finally {
-      setActionLoading(null);
-    }
+    try { await api.post(`/admin/decline/${id}`, { reason }); showToast('User declined and notified.'); loadPending(); }
+    catch { showToast('Failed to decline user', false); }
+    finally { setActionLoading(null); }
   };
 
-  // ── Waitlist loaders ──────────────────────────────────────────────────────
+  // ── Waitlist ──────────────────────────────────────────────────────────────
 
   const loadWaitlist = useCallback(async () => {
     setWaitlistLoading(true);
     try {
-      // Load selected status + counts for all statuses in parallel
       const [current, ...counts] = await Promise.all([
         api.get(`/admin/waitlist?status=${waitlistStatus}`),
         ...WAITLIST_STATUSES.map(s => api.get(`/admin/waitlist?status=${s}`)),
       ]);
       setEntries(current.data.entries || []);
-      const newCounts: Record<string, number> = {};
-      WAITLIST_STATUSES.forEach((s, i) => {
-        newCounts[s] = (counts[i].data.entries || []).length;
-      });
-      setWaitlistCounts(newCounts);
-    } catch {
-      showToast('Failed to load waitlist', false);
-    } finally {
-      setWaitlistLoading(false);
-    }
+      const nc: Record<string, number> = {};
+      WAITLIST_STATUSES.forEach((s, i) => { nc[s] = (counts[i].data.entries || []).length; });
+      setWaitlistCounts(nc);
+    } catch { showToast('Failed to load waitlist', false); }
+    finally { setWaitlistLoading(false); }
   }, [waitlistStatus]);
 
   const sendInvite = async (id: number) => {
     setActionLoading(id);
-    try {
-      await api.post(`/admin/waitlist/${id}/invite`);
-      showToast('Invite sent successfully');
-      loadWaitlist();
-    } catch (err: any) {
-      showToast(err?.response?.data?.error || 'Failed to send invite', false);
-    } finally {
-      setActionLoading(null);
-    }
+    try { await api.post(`/admin/waitlist/${id}/invite`); showToast('Invite sent successfully'); loadWaitlist(); }
+    catch (err: any) { showToast(err?.response?.data?.error || 'Failed to send invite', false); }
+    finally { setActionLoading(null); }
   };
 
   const declineWaitlist = async (id: number) => {
     if (!window.confirm('Decline this waitlist entry?')) return;
     setActionLoading(id);
-    try {
-      await api.post(`/admin/waitlist/${id}/decline`);
-      showToast('Entry declined');
-      loadWaitlist();
-    } catch {
-      showToast('Failed to decline', false);
-    } finally {
-      setActionLoading(null);
-    }
+    try { await api.post(`/admin/waitlist/${id}/decline`); showToast('Entry declined'); loadWaitlist(); }
+    catch { showToast('Failed to decline', false); }
+    finally { setActionLoading(null); }
   };
 
-  // ── Effects ───────────────────────────────────────────────────────────────
+  useEffect(() => { loadPending(); }, [loadPending]);
+  useEffect(() => { if (activeTab === 'waitlist') loadWaitlist(); }, [activeTab, loadWaitlist]);
 
-  useEffect(() => {
-    loadPending();
-  }, [loadPending]);
-
-  useEffect(() => {
-    if (activeTab === 'waitlist') loadWaitlist();
-  }, [activeTab, loadWaitlist]);
-
-  // ── Styles ────────────────────────────────────────────────────────────────
+  // ── Shared styles ─────────────────────────────────────────────────────────
 
   const th: React.CSSProperties = {
-    padding: '9px 14px', textAlign: 'left', fontSize: 12,
-    color: '#6b7280', fontWeight: 600, borderBottom: '1px solid #e5e7eb',
-    whiteSpace: 'nowrap', backgroundColor: '#f9fafb',
+    padding: '10px 16px', textAlign: 'left', fontSize: 11,
+    fontWeight: 700, color: T.muted, whiteSpace: 'nowrap',
+    backgroundColor: '#FAFAF8', textTransform: 'uppercase',
+    letterSpacing: '0.06em', fontFamily: T.font,
   };
   const td: React.CSSProperties = {
-    padding: '11px 14px', fontSize: 13, color: '#374151',
-    borderBottom: '1px solid #f3f4f6', verticalAlign: 'top',
+    padding: '13px 16px', fontSize: 13, color: T.text,
+    borderBottom: `1px solid ${T.border}`, verticalAlign: 'top',
+    fontFamily: T.font,
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  const btnPrimary = (disabled?: boolean): React.CSSProperties => ({
+    padding: '6px 14px', borderRadius: 7, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+    backgroundColor: T.green, color: 'white', fontWeight: 600, fontSize: 12,
+    opacity: disabled ? 0.55 : 1, fontFamily: T.font,
+  });
+  const btnGhost = (disabled?: boolean): React.CSSProperties => ({
+    padding: '6px 14px', borderRadius: 7, border: `1px solid #FECACA`,
+    backgroundColor: 'white', color: T.red, cursor: disabled ? 'not-allowed' : 'pointer',
+    fontWeight: 500, fontSize: 12, opacity: disabled ? 0.55 : 1, fontFamily: T.font,
+  });
 
   return (
-    <div>
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'fixed', top: 20, right: 20, zIndex: 9999,
-          padding: '12px 20px', borderRadius: 8, color: 'white', fontWeight: 500,
-          backgroundColor: toast.ok ? '#16a34a' : '#dc2626',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-        }}>
-          {toast.msg}
-        </div>
-      )}
+    <div style={{ fontFamily: T.font }}>
+      {toast && <Toast {...toast} />}
 
       {/* Header */}
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#111827' }}>Queue</h1>
-        <p style={{ margin: '4px 0 0', fontSize: 14, color: '#6b7280' }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: T.text, letterSpacing: '-0.02em' }}>Queue</h1>
+        <p style={{ margin: '4px 0 0', fontSize: 13, color: T.muted }}>
           Review pending applications and manage the waitlist in one place.
         </p>
       </div>
 
       {/* Tab bar */}
-      <div style={{
-        display: 'flex', borderBottom: '1px solid #e5e7eb', marginBottom: 24, gap: 0,
-      }}>
+      <div style={{ display: 'flex', borderBottom: `1px solid ${T.border}`, marginBottom: 26, gap: 0 }}>
         {([
-          { key: 'pending', label: 'Pending Review', count: pendingCount },
-          { key: 'waitlist', label: 'Waitlist', count: waitlistCounts['waiting'] ?? null },
+          { key: 'pending',   label: 'Pending Review', count: pendingCount },
+          { key: 'waitlist',  label: 'Waitlist',        count: waitlistCounts['waiting'] ?? null },
         ] as { key: ActiveTab; label: string; count: number | null }[]).map(({ key, label, count }) => {
           const active = activeTab === key;
           return (
@@ -224,19 +212,19 @@ export default function AdminQueue(): JSX.Element {
               key={key}
               onClick={() => setActiveTab(key)}
               style={{
-                padding: '10px 20px', fontSize: 14, fontWeight: active ? 600 : 400,
+                padding: '10px 20px', fontSize: 13, fontWeight: active ? 600 : 400,
                 border: 'none', borderBottom: active ? '2px solid #15803d' : '2px solid transparent',
                 backgroundColor: 'transparent', cursor: 'pointer',
-                color: active ? '#15803d' : '#6b7280',
-                marginBottom: -1, display: 'flex', alignItems: 'center', gap: 7,
+                color: active ? T.green : T.muted, marginBottom: -1,
+                display: 'flex', alignItems: 'center', gap: 7, fontFamily: T.font,
               }}
             >
               {label}
               {count !== null && count > 0 && (
                 <span style={{
-                  backgroundColor: active ? '#15803d' : '#e5e7eb',
-                  color: active ? 'white' : '#6b7280',
-                  borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 700,
+                  backgroundColor: active ? T.green : '#F0EDE8',
+                  color: active ? 'white' : T.muted,
+                  borderRadius: 10, padding: '1px 7px', fontSize: 10, fontWeight: 700,
                 }}>
                   {count}
                 </span>
@@ -246,87 +234,50 @@ export default function AdminQueue(): JSX.Element {
         })}
       </div>
 
-      {/* ── Pending Tab ──────────────────────────────────────────────────── */}
+      {/* ── Pending Tab ─────────────────────────────────────────────────── */}
       {activeTab === 'pending' && (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
-            <button
-              onClick={loadPending}
-              style={{
-                padding: '6px 14px', borderRadius: 6, border: '1px solid #d1d5db',
-                backgroundColor: 'white', cursor: 'pointer', fontSize: 13, color: '#374151',
-              }}
-            >
+            <button onClick={loadPending} style={{ padding: '6px 14px', borderRadius: 7, border: `1px solid ${T.border}`, backgroundColor: T.surface, cursor: 'pointer', fontSize: 12, color: T.muted, fontFamily: T.font }}>
               ↻ Refresh
             </button>
           </div>
 
           {pendingLoading ? (
-            <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>Loading...</div>
+            <p style={{ color: T.faint, fontSize: 14, textAlign: 'center', padding: 40 }}>Loading...</p>
           ) : pendingUsers.length === 0 ? (
-            <div style={{
-              textAlign: 'center', padding: 60, backgroundColor: 'white',
-              borderRadius: 10, border: '1px solid #e5e7eb', color: '#9ca3af',
-            }}>
+            <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: T.surface, borderRadius: 14, border: `1px solid ${T.border}`, color: T.faint, fontSize: 14 }}>
               No pending applications.
             </div>
           ) : (
-            <div style={{ overflowX: 'auto', backgroundColor: 'white', borderRadius: 10, border: '1px solid #e5e7eb' }}>
+            <div style={{ backgroundColor: T.surface, borderRadius: 14, border: `1px solid ${T.border}`, overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    <th style={th}>Name</th>
-                    <th style={th}>Email</th>
-                    <th style={th}>GSTN</th>
-                    <th style={th}>Phone</th>
-                    <th style={th}>Invited By</th>
-                    <th style={th}>Registered</th>
-                    <th style={th}>Actions</th>
+                    {['Name', 'Email', 'GSTN', 'Phone', 'Invited By', 'Registered', 'Actions'].map(h => (
+                      <th key={h} style={th}>{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {pendingUsers.map(u => (
                     <tr key={u.id}>
-                      <td style={{ ...td, fontWeight: 600, color: '#111827' }}>
-                        {u.first_name} {u.last_name}
-                      </td>
+                      <td style={{ ...td, fontWeight: 600 }}>{u.first_name} {u.last_name}</td>
                       <td style={td}>{u.email}</td>
-                      <td style={td}>
-                        <code style={{ fontSize: 12, color: '#374151' }}>{u.gstn || '—'}</code>
-                      </td>
-                      <td style={td}>{u.phone_number || '—'}</td>
+                      <td style={{ ...td, fontFamily: 'monospace', fontSize: 12 }}>{u.gstn || <span style={{ color: T.faint }}>—</span>}</td>
+                      <td style={td}>{u.phone_number || <span style={{ color: T.faint }}>—</span>}</td>
                       <td style={td}>
                         {u.invited_by_username
-                          ? <span style={{ color: '#374151' }}>{u.invited_by_username}</span>
-                          : <span style={{ color: '#9ca3af' }}>Marketing</span>}
+                          ? <span>{u.invited_by_username}</span>
+                          : <span style={{ color: T.faint }}>Marketing</span>}
                       </td>
-                      <td style={{ ...td, whiteSpace: 'nowrap', color: '#9ca3af', fontSize: 12 }}>
+                      <td style={{ ...td, fontSize: 12, color: T.faint, whiteSpace: 'nowrap' }}>
                         {new Date(u.created_at).toLocaleDateString('en-IN')}
                       </td>
                       <td style={td}>
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <button
-                            onClick={() => approvePending(u.id)}
-                            disabled={actionLoading === u.id}
-                            style={{
-                              padding: '5px 14px', backgroundColor: '#16a34a', color: 'white',
-                              border: 'none', borderRadius: 5, fontSize: 12, cursor: 'pointer',
-                              opacity: actionLoading === u.id ? 0.6 : 1,
-                            }}
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => declinePending(u.id)}
-                            disabled={actionLoading === u.id}
-                            style={{
-                              padding: '5px 14px', backgroundColor: 'white', color: '#dc2626',
-                              border: '1px solid #fca5a5', borderRadius: 5, fontSize: 12, cursor: 'pointer',
-                              opacity: actionLoading === u.id ? 0.6 : 1,
-                            }}
-                          >
-                            Decline
-                          </button>
+                          <button onClick={() => approvePending(u.id)} disabled={actionLoading === u.id} style={btnPrimary(actionLoading === u.id)}>Approve</button>
+                          <button onClick={() => declinePending(u.id)} disabled={actionLoading === u.id} style={btnGhost(actionLoading === u.id)}>Decline</button>
                         </div>
                       </td>
                     </tr>
@@ -338,103 +289,67 @@ export default function AdminQueue(): JSX.Element {
         </>
       )}
 
-      {/* ── Waitlist Tab ──────────────────────────────────────────────────── */}
+      {/* ── Waitlist Tab ─────────────────────────────────────────────────── */}
       {activeTab === 'waitlist' && (
         <>
-          {/* Status sub-tabs */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 18, alignItems: 'center' }}>
             {WAITLIST_STATUSES.map(s => (
               <button
                 key={s}
                 onClick={() => setWaitlistStatus(s)}
                 style={{
-                  padding: '5px 14px', borderRadius: 16, border: 'none', cursor: 'pointer',
-                  fontSize: 13, fontWeight: 500,
-                  backgroundColor: waitlistStatus === s ? '#15803d' : '#f3f4f6',
-                  color: waitlistStatus === s ? 'white' : '#374151',
+                  padding: '5px 14px', borderRadius: 20,
+                  border: `1px solid ${waitlistStatus === s ? T.green : T.border}`,
+                  cursor: 'pointer', fontSize: 12, fontWeight: waitlistStatus === s ? 600 : 400,
+                  backgroundColor: waitlistStatus === s ? T.green : T.surface,
+                  color: waitlistStatus === s ? 'white' : T.muted,
+                  fontFamily: T.font,
                 }}
               >
                 {s.charAt(0).toUpperCase() + s.slice(1)}
                 {waitlistCounts[s] !== undefined && (
-                  <span style={{ marginLeft: 5, opacity: 0.8 }}>({waitlistCounts[s]})</span>
+                  <span style={{ marginLeft: 5, opacity: 0.75 }}>({waitlistCounts[s]})</span>
                 )}
               </button>
             ))}
-            <button
-              onClick={loadWaitlist}
-              style={{
-                marginLeft: 'auto', padding: '5px 14px', borderRadius: 6,
-                border: '1px solid #d1d5db', backgroundColor: 'white',
-                cursor: 'pointer', fontSize: 13, color: '#374151',
-              }}
-            >
-              ↻ Refresh
+            <button onClick={loadWaitlist} style={{ marginLeft: 'auto', padding: '5px 12px', borderRadius: 7, border: `1px solid ${T.border}`, backgroundColor: T.surface, cursor: 'pointer', fontSize: 12, color: T.muted, fontFamily: T.font }}>
+              ↻
             </button>
           </div>
 
           {waitlistLoading ? (
-            <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>Loading...</div>
+            <p style={{ color: T.faint, fontSize: 14, textAlign: 'center', padding: 40 }}>Loading...</p>
           ) : entries.length === 0 ? (
-            <div style={{
-              textAlign: 'center', padding: 60, backgroundColor: 'white',
-              borderRadius: 10, border: '1px solid #e5e7eb', color: '#9ca3af',
-            }}>
+            <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: T.surface, borderRadius: 14, border: `1px solid ${T.border}`, color: T.faint, fontSize: 14 }}>
               No {waitlistStatus} entries.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {entries.map(e => (
-                <div key={e.id} style={{
-                  backgroundColor: 'white', border: '1px solid #e5e7eb',
-                  borderRadius: 10, padding: '16px 20px',
-                }}>
+                <div key={e.id} style={{ backgroundColor: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '16px 20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>
-                          {e.first_name} {e.last_name}
-                        </span>
-                        {badge(e.status, WAITLIST_COLORS[e.status] || '#6b7280')}
+                        <span style={{ fontWeight: 700, fontSize: 15, color: T.text }}>{e.first_name} {e.last_name}</span>
+                        <Badge label={e.status} color={WAITLIST_COLORS[e.status] || '#6B7280'} />
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '3px 20px' }}>
-                        <span style={{ fontSize: 13, color: '#6b7280' }}>{e.email}</span>
-                        <span style={{ fontSize: 13, color: '#6b7280' }}>{e.mobile_number || '—'}</span>
-                        {e.gstn && <span style={{ fontSize: 13, color: '#6b7280' }}>GSTN: {e.gstn}</span>}
-                        <span style={{ fontSize: 12, color: '#9ca3af' }}>
-                          {new Date(e.created_at).toLocaleDateString('en-IN')}
-                        </span>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '3px 20px' }}>
+                        <span style={{ fontSize: 13, color: T.muted }}>{e.email}</span>
+                        <span style={{ fontSize: 13, color: T.muted }}>{e.mobile_number || '—'}</span>
+                        {e.gstn && <span style={{ fontSize: 13, color: T.muted, fontFamily: 'monospace' }}>GSTN: {e.gstn}</span>}
+                        <span style={{ fontSize: 12, color: T.faint }}>{new Date(e.created_at).toLocaleDateString('en-IN')}</span>
                       </div>
                       {e.business_description && (
-                        <p style={{ margin: '8px 0 0', fontSize: 13, color: '#374151', fontStyle: 'italic' }}>
-                          "{e.business_description}"
-                        </p>
+                        <p style={{ margin: '8px 0 0', fontSize: 13, color: T.muted, fontStyle: 'italic', lineHeight: 1.5 }}>"{e.business_description}"</p>
                       )}
                     </div>
 
                     {e.status === 'waiting' && (
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button
-                          onClick={() => sendInvite(e.id)}
-                          disabled={actionLoading === e.id}
-                          style={{
-                            padding: '7px 16px', borderRadius: 6, border: 'none',
-                            backgroundColor: '#15803d', color: 'white', fontWeight: 600,
-                            fontSize: 13, cursor: 'pointer',
-                            opacity: actionLoading === e.id ? 0.6 : 1,
-                          }}
-                        >
-                          {actionLoading === e.id ? 'Sending...' : 'Send Invite'}
+                      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                        <button onClick={() => sendInvite(e.id)} disabled={actionLoading === e.id} style={btnPrimary(actionLoading === e.id)}>
+                          {actionLoading === e.id ? 'Sending…' : 'Send Invite'}
                         </button>
-                        <button
-                          onClick={() => declineWaitlist(e.id)}
-                          disabled={actionLoading === e.id}
-                          style={{
-                            padding: '7px 16px', borderRadius: 6, border: '1px solid #fca5a5',
-                            backgroundColor: 'white', color: '#dc2626', fontWeight: 500,
-                            fontSize: 13, cursor: 'pointer',
-                            opacity: actionLoading === e.id ? 0.6 : 1,
-                          }}
-                        >
+                        <button onClick={() => declineWaitlist(e.id)} disabled={actionLoading === e.id} style={btnGhost(actionLoading === e.id)}>
                           Decline
                         </button>
                       </div>

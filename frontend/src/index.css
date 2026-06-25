@@ -1,6 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── Admin panel scoped refinements ──────────────────────────────── */
+
+/* Smooth font rendering for admin text */
+.admin-root *, .admin-root *::before, .admin-root *::after {
+  font-family: 'Inter', 'DM Sans', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Subtle scroll track for admin sidebar */
+aside::-webkit-scrollbar { width: 4px; }
+aside::-webkit-scrollbar-track { background: transparent; }
+aside::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+/* Hover lift on admin cards */
+.admin-card-hover {
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+.admin-card-hover:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.07);
+  transform: translateY(-1px);
+}
+
+/* Tabular numbers in admin tables */
+.admin-root td, .admin-root th {
+  font-variant-numeric: tabular-nums;
+}
 
 :root {
   /* FoodLobby brand palette — derived from logo */
