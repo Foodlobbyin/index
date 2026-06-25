@@ -23,6 +23,22 @@ interface ContactPerson {
   position: string | null;
 }
 
+interface CompanyResponse {
+  id: number;
+  response_text: string;
+  default_categories: string[];
+  responded_at: string;
+}
+
+interface IncidentSummary {
+  id: number;
+  company_name: string;
+  incident_type: string;
+  status: string;
+  created_at: string;
+  company_response: CompanyResponse | null;
+}
+
 interface CompanyViewData {
   company_name: string;
   gstn: string;
@@ -30,7 +46,23 @@ interface CompanyViewData {
   total_unpaid: number;
   invoices: IncidentInvoice[];
   contact_persons: ContactPerson[];
+  incidents?: IncidentSummary[];
 }
+
+const RESPONSE_CATEGORY_LABELS: Record<string, string> = {
+  quality_issue: 'Quality Issue',
+  short_delivery: 'Short / Wrong Delivery',
+  rate_dispute: 'Rate / Price Dispute',
+  commitment_breach: 'Commitment / Delivery Breach',
+  documentation_incomplete: 'Incomplete / Incorrect Documentation',
+  financial_hardship: 'Financial Hardship / Cash Flow',
+  legal_dispute: 'Under Legal Dispute / Arbitration',
+  already_paid: 'Already Paid — Proof Available',
+  force_majeure: 'Force Majeure',
+  mutual_negotiation: 'Mutual Negotiation Pending',
+  deduction_claim: 'Deduction / Claim Against Supplier',
+  other: 'Other',
+};
 
 function daysOverdue(dueDateStr: string | null): number | null {
   if (!dueDateStr) return null;
@@ -259,6 +291,58 @@ export default function CompanyView(): JSX.Element {
           </div>
         )}
       </div>
+
+      {/* Company Responses */}
+      {data.incidents && data.incidents.some(i => i.company_response) && (
+        <div style={card}>
+          <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: '#111827' }}>
+            Company's Responses
+          </h2>
+          <p style={{ margin: '0 0 16px', fontSize: 13, color: '#6b7280' }}>
+            The reported company has provided their side of the story for the following incidents.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {data.incidents.filter(i => i.company_response).map((inc) => {
+              const r = inc.company_response!;
+              return (
+                <div key={inc.id} style={{
+                  border: '1px solid #bbf7d0', borderRadius: 10,
+                  backgroundColor: '#f0fdf4', overflow: 'hidden',
+                }}>
+                  <div style={{
+                    padding: '10px 16px', backgroundColor: '#16a34a',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}>
+                    <span style={{ color: 'white', fontWeight: 600, fontSize: 13 }}>
+                      Response to Incident #{inc.id} — {inc.incident_type.replace(/_/g,' ')}
+                    </span>
+                    <span style={{ color: '#bbf7d0', fontSize: 11 }}>
+                      {new Date(r.responded_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
+                    </span>
+                  </div>
+                  <div style={{ padding: '14px 16px' }}>
+                    {r.default_categories.length > 0 && (
+                      <div style={{ marginBottom: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {r.default_categories.map(catId => (
+                          <span key={catId} style={{
+                            padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600,
+                            backgroundColor: '#dcfce7', color: '#166534',
+                          }}>
+                            {RESPONSE_CATEGORY_LABELS[catId] ?? catId}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <p style={{ margin: 0, fontSize: 13, color: '#1f2937', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+                      {r.response_text}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Contact Persons */}
       <div style={card}>
