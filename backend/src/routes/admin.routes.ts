@@ -513,4 +513,112 @@ router.post('/invite-direct', async (c) => {
   }, 201);
 });
 
+/**
+ * GET /api/admin/analytics
+ * Rich analytics data for the admin dashboard charts.
+ * All queries run against existing tables — no schema changes needed.
+ */
+router.get('/analytics', async (c) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+
+  const [
+    signupsTrend,
+    inviteFunnel,
+    searchActivity,
+    trustDistribution,
+    incidentsTrend,
+    waitlistTrend,
+    topSearches,
+    activationRate,
+    registrationStatus,
+  ] = await Promise.all([
+    // Signups per day — last 30 days
+    db.query(`
+      SELECT DATE(created_at AT TIME ZONE 'Asia/Kolkata') AS day, COUNT(*) AS count
+      FROM users
+      WHERE created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY day ORDER BY day ASC
+    `),
+
+    // Invite funnel: total sent, used, and converted to active users
+    db.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE status IN ('pending','used','expired','revoked')) AS sent,
+        COUNT(*) FILTER (WHERE status = 'used') AS used,
+        COUNT(*) FILTER (WHERE status = 'used' AND used_at IS NOT NULL) AS converted
+      FROM invite_tokens
+    `),
+
+    // Search activity by type — last 30 days
+    db.query(`
+      SELECT search_type, COUNT(*) AS count
+      FROM search_logs
+      WHERE created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY search_type
+    `),
+
+    // Trust level distribution
+    db.query(`
+      SELECT trust_level, COUNT(*) AS count
+      FROM users
+      GROUP BY trust_level
+    `),
+
+    // Incident submissions per day — last 30 days
+    db.query(`
+      SELECT DATE(created_at AT TIME ZONE 'Asia/Kolkata') AS day, COUNT(*) AS count
+      FROM incidents
+      WHERE created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY day ORDER BY day ASC
+    `),
+
+    // Waitlist signups per day — last 30 days
+    db.query(`
+      SELECT DATE(created_at AT TIME ZONE 'Asia/Kolkata') AS day, COUNT(*) AS count
+      FROM waitlist
+      WHERE created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY day ORDER BY day ASC
+    `),
+
+    // Top 10 searched GSTNs / values
+    db.query(`
+      SELECT search_value, search_type, COUNT(*) AS count
+      FROM search_logs
+      WHERE created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY search_value, search_type
+      ORDER BY count DESC
+      LIMIT 10
+    `),
+
+    // Activation rate: active vs total registered users
+    db.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE registration_status = 'active') AS active,
+        COUNT(*) FILTER (WHERE registration_status = 'pending_review') AS pending,
+        COUNT(*) FILTER (WHERE registration_status = 'declined') AS declined,
+        COUNT(*) AS total
+      FROM users
+    `),
+
+    // Registration status breakdown (for funnel)
+    db.query(`
+      SELECT registration_status, COUNT(*) AS count
+      FROM users
+      GROUP BY registration_status
+    `),
+  ]);
+
+  return c.json({
+    signups_trend: signupsTrend.rows,
+    invite_funnel: inviteFunnel.rows[0] || { sent: 0, used: 0, converted: 0 },
+    search_activity: searchActivity.rows,
+    trust_distribution: trustDistribution.rows,
+    incidents_trend: incidentsTrend.rows,
+    waitlist_trend: waitlistTrend.rows,
+    top_searches: topSearches.rows,
+    activation_rate: activationRate.rows[0] || { active: 0, pending: 0, declined: 0, total: 0 },
+    registration_status: registrationStatus.rows,
+  });
+});
+
 export default router;
