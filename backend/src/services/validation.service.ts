@@ -126,13 +126,13 @@ export class ValidationService {
 
       if (value === -1) return false;
 
-      // Double every second digit (from right, so positions 1, 3, 5, etc.)
-      if ((14 - i) % 2 === 0) {
+      // Double every odd-indexed position (1, 3, 5, ...)
+      if (i % 2 !== 0) {
         value *= 2;
       }
 
-      // If doubled value is > 35, add the digits (value / 36 + value % 36)
-      if (value > 35) {
+      // If doubled value is >= 36, add the digits (value / 36 + value % 36)
+      if (value >= 36) {
         sum += Math.floor(value / 36) + (value % 36);
       } else {
         sum += value;
