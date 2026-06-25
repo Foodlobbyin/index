@@ -212,6 +212,29 @@ router.get('/view-by-gstn', async (c) => {
 
   const incidentIds: number[] = incidentsResult.rows.map((r: any) => r.id);
 
+  // Step 2b: Fetch latest company response for each incident
+  const responsesResult = await db.query(
+    `SELECT DISTINCT ON (incident_id)
+       incident_id, id, response_text, default_categories, responded_at
+     FROM incident_responses
+     WHERE incident_id = ANY($1::int[])
+     ORDER BY incident_id, responded_at DESC`,
+    [incidentIds]
+  );
+  const responseByIncident: Record<number, any> = {};
+  for (const r of responsesResult.rows) {
+    responseByIncident[r.incident_id] = {
+      id: r.id,
+      response_text: r.response_text,
+      default_categories: r.default_categories ?? [],
+      responded_at: r.responded_at,
+    };
+  }
+  const incidents = incidentsResult.rows.map((inc: any) => ({
+    ...inc,
+    company_response: responseByIncident[inc.id] ?? null,
+  }));
+
   // Step 3: All invoices from incident_invoices for these incidents
   const invoicesResult = await db.query(
     `SELECT
@@ -251,7 +274,7 @@ router.get('/view-by-gstn', async (c) => {
     company: companyRow,
     company_name: companyRow.company_name,
     gstn: companyRow.gstn || '',
-    total_incidents: incidentsResult.rows.length,
+    total_incidents: incidents.length,
     total_invoices: invoicesResult.rows.length,
     total_unpaid: totalUnpaid,
     invoices: invoicesResult.rows,
