@@ -82,15 +82,12 @@ const AppShell: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <Link to="/" className="flex items-center space-x-2 shrink-0">
+            <Link to="/" className="flex items-center shrink-0">
               <img
-                src="/logo-mark.png"
+                src="/logo-lockup.png"
                 alt="FoodLobby"
                 className="h-9 w-auto"
               />
-              <span className="text-xl">
-                <span style={{ fontWeight: 400, color: '#3d3d3d' }}>Food</span><span style={{ fontWeight: 700, color: '#3d3d3d' }}>Lobby</span>
-              </span>
             </Link>
 
             {/* Nav links */}

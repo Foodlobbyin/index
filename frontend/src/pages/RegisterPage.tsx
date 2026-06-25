@@ -152,11 +152,8 @@ export default function RegisterPage(): JSX.Element {
       <div style={wrap}><div style={{ ...card, maxWidth: 480 }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-            <img src="/logo-mark.png" alt="FoodLobby" style={{ height: 56, width: 'auto' }} />
+            <img src="/logo-lockup.png" alt="FoodLobby" style={{ height: 56, width: 'auto' }} />
           </div>
-          <h1 style={{ fontSize: 22 }}>
-            <span style={{ fontWeight: 400, color: '#3d3d3d' }}>Food</span><span style={{ fontWeight: 700, color: '#3d3d3d' }}>Lobby</span>
-          </h1>
           <p style={{ color: '#6b7280', marginTop: 6, fontSize: 14 }}>
             FoodLobby is invite-only. Join the waitlist and our team will reach out if you are a good fit.
           </p>

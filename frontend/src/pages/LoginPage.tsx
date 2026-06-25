@@ -82,7 +82,7 @@ export default function LoginPage(): JSX.Element {
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <img
-              src="/logo-mark.png"
+              src="/logo-lockup.png"
               alt="FoodLobby"
               className="h-16 w-auto"
             />

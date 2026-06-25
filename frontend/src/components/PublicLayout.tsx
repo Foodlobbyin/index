@@ -20,20 +20,12 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <Link to="/" className="flex items-center space-x-2">
+            <Link to="/" className="flex items-center">
               <img
-                src="/logo-mark.png"
+                src="/logo-lockup.png"
                 alt="FoodLobby"
                 className="h-10 w-auto"
               />
-              <div>
-                <span className="text-xl font-bold">
-                  <span style={{ fontWeight: 400, color: '#3d3d3d' }}>Food</span><span style={{ fontWeight: 700, color: '#3d3d3d' }}>Lobby</span>
-                </span>
-                <span className="hidden sm:block text-xs text-gray-500 leading-none -mt-0.5">
-                  Trade Fraud Protection Network
-                </span>
-              </div>
             </Link>
 
             {/* Desktop Navigation */}
@@ -109,9 +101,9 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-3 gap-8">
             <div>
-              <h3 className="text-lg font-semibold mb-3">
-                <span style={{ fontWeight: 400 }}>Food</span><span style={{ fontWeight: 700 }}>Lobby</span>
-              </h3>
+              <div className="mb-3">
+                <img src="/logo-lockup.png" alt="FoodLobby" style={{ height: 32, width: 'auto' }} />
+              </div>
               <p className="text-gray-400 text-sm leading-relaxed">
                 A community-driven platform to report trade fraud, credit defaults, and
                 payment scams in India's food &amp; spice commodity sector.
