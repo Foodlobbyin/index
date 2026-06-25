@@ -6,6 +6,7 @@ import { authenticate, requireMinTrustLevel } from '../middleware/auth.middlewar
 import inviteTokenRepository from '../repositories/inviteToken.repository';
 import waitlistRepository from '../repositories/waitlist.repository';
 import emailService from '../services/email.service';
+import auditLogService from '../services/auditLog.service';
 
 const router = new Hono<AppBindings>();
 
