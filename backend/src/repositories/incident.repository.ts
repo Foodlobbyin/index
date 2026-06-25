@@ -244,6 +244,17 @@ export class IncidentRepository {
     );
     incident.contact_persons = contactsResult.rows;
 
+    // Fetch latest company response (submitted via My Defaults page)
+    const responseResult = await db.query(
+      `SELECT id, response_text, default_categories, responded_at
+       FROM incident_responses
+       WHERE incident_id = $1
+       ORDER BY responded_at DESC
+       LIMIT 1`,
+      [id]
+    );
+    incident.company_response = responseResult.rows[0] ?? null;
+
     return incident;
   }
 
@@ -295,11 +306,36 @@ export class IncidentRepository {
     const total = parseInt(countResult.rows[0].count, 10);
 
     const dataResult = await db.query(
-      `SELECT * FROM incidents ${where} ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`,
+      `SELECT
+         i.*,
+         cr.id            AS company_response_id,
+         cr.response_text AS company_response_text,
+         cr.default_categories AS company_response_categories,
+         cr.responded_at  AS company_response_responded_at
+       FROM incidents i
+       LEFT JOIN LATERAL (
+         SELECT id, response_text, default_categories, responded_at
+         FROM incident_responses
+         WHERE incident_id = i.id
+         ORDER BY responded_at DESC
+         LIMIT 1
+       ) cr ON TRUE
+       ${where} ORDER BY i.created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`,
       [...values, limit, offset]
     );
 
-    return { incidents: dataResult.rows, total };
+    // Reshape flat company_response columns into a nested object
+    const incidents = dataResult.rows.map((row: any) => {
+      const { company_response_id, company_response_text, company_response_categories, company_response_responded_at, ...rest } = row;
+      return {
+        ...rest,
+        company_response: company_response_id
+          ? { id: company_response_id, response_text: company_response_text, default_categories: company_response_categories ?? [], responded_at: company_response_responded_at }
+          : null,
+      };
+    });
+
+    return { incidents, total };
   }
 
   async update(db: DbClient, id: number, data: IncidentUpdateInput): Promise<Incident | null> {
