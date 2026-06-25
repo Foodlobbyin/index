@@ -66,11 +66,20 @@ export class UserRepository {
   }
 
   async findById(db: DbClient, id: number): Promise<UserResponse | null> {
+    // JOIN companies to include has_incidents so AppShell can gate "My Defaults"
+    // visibility from the session object — no extra API call needed at page load.
     const result = await db.query(
-      `SELECT id, username, mobile_number, phone_number, email,
-              first_name, last_name, gstn, email_verified, account_activated,
-              trust_level, registration_status, can_send_invites, created_at
-       FROM users WHERE id = $1`,
+      `SELECT
+         u.id, u.username, u.mobile_number, u.phone_number, u.email,
+         u.first_name, u.last_name, u.gstn, u.email_verified, u.account_activated,
+         u.trust_level, u.registration_status, u.can_send_invites, u.created_at,
+         COALESCE(c.has_incidents, FALSE) AS has_incidents
+       FROM users u
+       LEFT JOIN companies c
+         ON c.member_user_id = u.id
+            AND c.gstn IS NOT NULL
+       WHERE u.id = $1
+       LIMIT 1`,
       [id]
     );
     return result.rows[0] || null;
