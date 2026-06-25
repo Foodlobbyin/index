@@ -4,6 +4,7 @@ export interface IncidentResponse {
   responder_gstn: string;
   responder_name?: string;
   response_text: string;
+  default_categories: string[];
   responded_at: Date;
   created_at: Date;
 }
@@ -13,4 +14,5 @@ export interface IncidentResponseCreateInput {
   responder_gstn: string;
   responder_name?: string;
   response_text: string;
+  default_categories?: string[];
 }

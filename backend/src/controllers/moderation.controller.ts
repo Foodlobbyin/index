@@ -115,11 +115,14 @@ export class ModerationController {
       if (isNaN(id)) {
         return c.json({ error: 'Invalid incident ID' }, 400);
       }
-      const { responder_gstn, response_text, responder_name } = await c.req.json();
+      const { responder_gstn, response_text, responder_name, default_categories } = await c.req.json();
       if (!responder_gstn || !response_text) {
         return c.json({ error: 'responder_gstn and response_text are required' }, 400);
       }
-      const response = await moderationService.submitCompanyResponse(db, id, responder_gstn, response_text, responder_name);
+      const response = await moderationService.submitCompanyResponse(
+        db, id, responder_gstn, response_text, responder_name,
+        Array.isArray(default_categories) ? default_categories : []
+      );
       return c.json({ message: 'Response submitted', response }, 201);
     } catch (error: any) {
       if (error.message === 'Incident not found') {

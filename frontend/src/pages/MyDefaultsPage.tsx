@@ -1,329 +1,581 @@
+/**
+ * MyDefaultsPage — Company Response Portal
+ *
+ * Shown to users whose registered company has had an incident filed against it.
+ * Always visible to admin for pilot testing.
+ *
+ * Purpose: Let the accused company view each incident/invoice filed against
+ * them, select categories explaining the default, and submit their remark.
+ * No add/delete invoice actions — read-only on invoice data.
+ */
+
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { FileText, Plus, Search, AlertCircle, X } from 'lucide-react';
-import { invoiceService, Invoice } from '../services/invoiceService';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  CheckSquare,
+  Square,
+  MessageSquare,
+  FileText,
+  Clock,
+  CheckCircle2,
+  Info,
+} from 'lucide-react';
 
-const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
-  pending:   { bg: 'bg-amber-100',  text: 'text-amber-700',  label: 'PENDING'   },
-  paid:      { bg: 'bg-green-100',  text: 'text-green-700',  label: 'PAID'      },
-  overdue:   { bg: 'bg-red-100',    text: 'text-red-700',    label: 'OVERDUE'   },
-  cancelled: { bg: 'bg-gray-100',   text: 'text-gray-500',   label: 'CANCELLED' },
+// ── Default-reason categories ────────────────────────────────────────────────
+
+interface Category {
+  id: string;
+  label: string;
+  description: string;
+}
+
+const DEFAULT_CATEGORIES: Category[] = [
+  {
+    id: 'quality_issue',
+    label: 'Quality Issue',
+    description: 'Goods received were substandard, damaged, or did not match specifications.',
+  },
+  {
+    id: 'short_delivery',
+    label: 'Short / Wrong Delivery',
+    description: 'Quantity delivered was less than ordered, or wrong goods were sent.',
+  },
+  {
+    id: 'rate_dispute',
+    label: 'Rate / Price Dispute',
+    description: 'Final invoice rate differs from the mutually agreed rate or purchase order.',
+  },
+  {
+    id: 'commitment_breach',
+    label: 'Commitment / Delivery Breach',
+    description: 'Supplier did not honour agreed delivery dates, schedules, or terms.',
+  },
+  {
+    id: 'documentation_incomplete',
+    label: 'Incomplete / Incorrect Documentation',
+    description: 'Missing or erroneous invoice, E-way bill, GST invoice, or other docs.',
+  },
+  {
+    id: 'financial_hardship',
+    label: 'Financial Hardship / Cash Flow',
+    description: 'Temporary liquidity or cash-flow issue on our side; payment is intended.',
+  },
+  {
+    id: 'legal_dispute',
+    label: 'Under Legal Dispute / Arbitration',
+    description: 'This transaction is subject to an ongoing legal dispute or arbitration.',
+  },
+  {
+    id: 'already_paid',
+    label: 'Already Paid — Proof Available',
+    description: 'Payment has already been made; reconciliation or proof can be shared.',
+  },
+  {
+    id: 'force_majeure',
+    label: 'Force Majeure',
+    description: 'Unforeseeable event (natural calamity, pandemic, government order) caused the delay.',
+  },
+  {
+    id: 'mutual_negotiation',
+    label: 'Mutual Negotiation Pending',
+    description: 'Both parties are in active negotiation — settlement is being worked out.',
+  },
+  {
+    id: 'deduction_claim',
+    label: 'Deduction / Claim Against Supplier',
+    description: 'Amount withheld as a deduction or claim for damages, penalties, or short supply.',
+  },
+  {
+    id: 'other',
+    label: 'Other',
+    description: 'Reason not listed above — please describe in the remark field.',
+  },
+];
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface InvoiceItem {
+  id: number;
+  incident_id: number;
+  invoice_number: string;
+  amount: string | number;
+  amount_unpaid?: string | number | null;
+  issue_date: string;
+  due_date: string;
+  status: string;
+  category?: string;
+  item_sold?: string;
+  description?: string;
+}
+
+interface MyResponse {
+  id: number;
+  incident_id: number;
+  response_text: string;
+  default_categories: string[];
+  responded_at: string;
+}
+
+interface IncidentItem {
+  id: number;
+  company_gstn: string;
+  company_name: string;
+  incident_type: string;
+  incident_date?: string;
+  incident_title: string;
+  description: string;
+  amount_involved?: string | number | null;
+  currency_code: string;
+  status: string;
+  created_at: string;
+  invoices: InvoiceItem[];
+  my_response: MyResponse | null;
+}
+
+// ── Status badge helper ──────────────────────────────────────────────────────
+
+const statusBadge: Record<string, { bg: string; text: string }> = {
+  submitted:    { bg: 'bg-blue-100',   text: 'text-blue-700'   },
+  under_review: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+  approved:     { bg: 'bg-green-100',  text: 'text-green-700'  },
+  resolved:     { bg: 'bg-purple-100', text: 'text-purple-700' },
 };
 
-const daysSince = (dateStr: string): number => {
-  const d = new Date(dateStr);
-  const now = new Date();
-  return Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+const fmt = (n: string | number | null | undefined) =>
+  n != null ? `₹${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '—';
+
+// ── Sub-component: ResponsePanel ─────────────────────────────────────────────
+
+interface ResponsePanelProps {
+  incident: IncidentItem;
+  gstn: string;
+  onResponseSaved: (incidentId: number, response: MyResponse) => void;
+}
+
+const ResponsePanel: React.FC<ResponsePanelProps> = ({ incident, gstn, onResponseSaved }) => {
+  const existing = incident.my_response;
+
+  const [editing, setEditing] = useState(!existing);
+  const [selectedCats, setSelectedCats] = useState<string[]>(existing?.default_categories ?? []);
+  const [remark, setRemark] = useState(existing?.response_text ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const toggleCat = (id: string) => {
+    setSelectedCats((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (!remark.trim()) { setError('Please enter a remark before submitting.'); return; }
+    if (selectedCats.length === 0) { setError('Please select at least one category.'); return; }
+    setError(null);
+    setSaving(true);
+    try {
+      const { default: api } = await import('../services/api');
+      const res = await api.post(`/incidents/${incident.id}/respond`, {
+        responder_gstn: gstn,
+        response_text: remark.trim(),
+        default_categories: selectedCats,
+      });
+      const saved: MyResponse = res.data.response;
+      onResponseSaved(incident.id, saved);
+      setEditing(false);
+    } catch (err: unknown) {
+      const msg =
+        (err as any)?.response?.data?.error ??
+        (err as any)?.response?.data?.message ??
+        'Failed to submit response.';
+      setError(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Existing response display ──
+  if (!editing && existing) {
+    return (
+      <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-green-700 font-medium text-sm">
+            <CheckCircle2 size={16} />
+            Your response was submitted
+          </div>
+          <button
+            onClick={() => setEditing(true)}
+            className="text-xs text-blue-600 hover:underline font-medium"
+          >
+            Update response
+          </button>
+        </div>
+
+        {existing.default_categories.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {existing.default_categories.map((catId) => {
+              const cat = DEFAULT_CATEGORIES.find((c) => c.id === catId);
+              return cat ? (
+                <span key={catId} className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                  {cat.label}
+                </span>
+              ) : null;
+            })}
+          </div>
+        )}
+
+        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+          {existing.response_text}
+        </p>
+        <p className="text-xs text-gray-400">
+          Submitted on {new Date(existing.responded_at).toLocaleDateString('en-IN', {
+            day: 'numeric', month: 'short', year: 'numeric',
+          })}
+        </p>
+      </div>
+    );
+  }
+
+  // ── Response form ──
+  return (
+    <div className="mt-4 border border-blue-200 rounded-lg p-4 bg-blue-50 space-y-4">
+      <p className="text-sm font-semibold text-blue-900 flex items-center gap-2">
+        <MessageSquare size={16} />
+        {existing ? 'Update your response' : 'Submit your response'}
+      </p>
+
+      {error && (
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-700">
+          <AlertCircle size={14} />
+          {error}
+        </div>
+      )}
+
+      {/* Category checklist */}
+      <div>
+        <p className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
+          Why was the payment stopped? (select all that apply)
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {DEFAULT_CATEGORIES.map((cat) => {
+            const checked = selectedCats.includes(cat.id);
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => toggleCat(cat.id)}
+                className={`flex items-start gap-2 p-2.5 rounded-lg border text-left transition-colors ${
+                  checked
+                    ? 'border-blue-500 bg-blue-100'
+                    : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'
+                }`}
+              >
+                <span className="mt-0.5 shrink-0">
+                  {checked
+                    ? <CheckSquare size={16} className="text-blue-600" />
+                    : <Square size={16} className="text-gray-400" />
+                  }
+                </span>
+                <span>
+                  <span className={`block text-xs font-semibold ${checked ? 'text-blue-800' : 'text-gray-700'}`}>
+                    {cat.label}
+                  </span>
+                  <span className="block text-xs text-gray-500 leading-snug mt-0.5">
+                    {cat.description}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Remark textarea */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+          Your Remark *
+        </label>
+        <textarea
+          rows={4}
+          value={remark}
+          onChange={(e) => setRemark(e.target.value)}
+          placeholder="Provide your side of the story — include any relevant facts, dates, or agreements that support your position."
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-vertical bg-white"
+          disabled={saving}
+        />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleSubmit}
+          disabled={saving}
+          className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {saving ? 'Submitting…' : 'Submit Response'}
+        </button>
+        {existing && (
+          <button
+            onClick={() => { setEditing(false); setSelectedCats(existing.default_categories); setRemark(existing.response_text); setError(null); }}
+            className="px-5 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
 };
+
+// ── Sub-component: IncidentCard ───────────────────────────────────────────────
+
+interface IncidentCardProps {
+  incident: IncidentItem;
+  gstn: string;
+  onResponseSaved: (incidentId: number, response: MyResponse) => void;
+}
+
+const IncidentCard: React.FC<IncidentCardProps> = ({ incident, gstn, onResponseSaved }) => {
+  const [expanded, setExpanded] = useState(false);
+  const badge = statusBadge[incident.status] ?? { bg: 'bg-gray-100', text: 'text-gray-600' };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      {/* Header row — always visible */}
+      <button
+        className="w-full text-left p-5 flex items-start justify-between gap-4 hover:bg-gray-50 transition-colors"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${badge.bg} ${badge.text}`}>
+              {incident.status.replace(/_/g, ' ').toUpperCase()}
+            </span>
+            <span className="text-xs text-gray-400 font-mono">#{incident.id}</span>
+            {incident.my_response && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 flex items-center gap-1">
+                <CheckCircle2 size={12} /> Responded
+              </span>
+            )}
+          </div>
+          <p className="text-sm font-semibold text-gray-900 truncate">{incident.incident_title}</p>
+          <div className="mt-1 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+            <span className="flex items-center gap-1">
+              <FileText size={12} />
+              {incident.incident_type.replace(/_/g, ' ')}
+            </span>
+            {incident.amount_involved && (
+              <span className="font-medium text-red-600">
+                {fmt(incident.amount_involved)} {incident.currency_code}
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <Clock size={12} />
+              {new Date(incident.created_at).toLocaleDateString('en-IN')}
+            </span>
+          </div>
+        </div>
+        <span className="shrink-0 text-gray-400 mt-0.5">
+          {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </span>
+      </button>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div className="border-t border-gray-100 px-5 pb-5 pt-4 space-y-5">
+
+          {/* Incident description */}
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Complaint Details</p>
+            <p className="text-sm text-gray-700 leading-relaxed">{incident.description}</p>
+          </div>
+
+          {/* Invoices table */}
+          {incident.invoices.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+                Invoices Cited ({incident.invoices.length})
+              </p>
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {['Invoice #', 'Amount', 'Unpaid', 'Issue Date', 'Due Date', 'Item'].map((h) => (
+                        <th key={h} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {incident.invoices.map((inv) => (
+                      <tr key={inv.id}>
+                        <td className="px-3 py-2 font-mono text-xs text-gray-800">{inv.invoice_number}</td>
+                        <td className="px-3 py-2 font-medium text-gray-900">{fmt(inv.amount)}</td>
+                        <td className="px-3 py-2 font-medium text-red-600">{fmt(inv.amount_unpaid)}</td>
+                        <td className="px-3 py-2 text-gray-600">
+                          {inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('en-IN') : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">
+                          {inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-IN') : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">{inv.item_sold || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                <Info size={12} />
+                These invoice details were submitted by the complainant. You cannot edit them.
+              </p>
+            </div>
+          )}
+
+          {/* Response panel */}
+          <ResponsePanel incident={incident} gstn={gstn} onResponseSaved={onResponseSaved} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Main Page ────────────────────────────────────────────────────────────────
 
 const MyDefaultsPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState<Invoice | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [incidents, setIncidents] = useState<IncidentItem[]>([]);
+  const [gstn, setGstn] = useState<string>('');
+  const [companyName, setCompanyName] = useState<string>('');
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        const data = await invoiceService.getInvoices();
-        setInvoices(data);
+        const { default: api } = await import('../services/api');
+        const res = await api.get('/incidents/against-my-company');
+        const data = res.data;
+        setIncidents(data.incidents ?? []);
+        setGstn(data.gstn ?? '');
+        setCompanyName(data.company_name ?? '');
       } catch (err: unknown) {
         const msg =
           (err as any)?.response?.data?.error ??
           (err as any)?.response?.data?.message ??
-          (err instanceof Error ? err.message : 'Failed to load your invoice defaults.');
+          'Failed to load incident data.';
         setError(msg);
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, []);
+  }, [user?.id]);
 
-  const filtered = invoices.filter((inv) => {
-    const q = search.toLowerCase();
-    const matchSearch =
-      !q ||
-      inv.invoice_number.toLowerCase().includes(q) ||
-      (inv.category || '').toLowerCase().includes(q) ||
-      (inv.description || '').toLowerCase().includes(q);
-    const matchStatus = !statusFilter || inv.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
-
-  const totalUnpaid = invoices
-    .filter((inv) => inv.status === 'pending' || inv.status === 'overdue')
-    .reduce((sum, inv) => sum + Number(inv.amount_unpaid ?? inv.amount), 0);
-
-  const overdueCount = invoices.filter((inv) => inv.status === 'overdue').length;
-  const pendingCount = invoices.filter((inv) => inv.status === 'pending').length;
-
-  const handleDeleteConfirm = async () => {
-    if (!confirmDelete) return;
-    setDeletingId(confirmDelete.id);
-    setConfirmDelete(null);
-    try {
-      await invoiceService.deleteInvoice(confirmDelete.id);
-      setInvoices((prev) => prev.filter((inv) => inv.id !== confirmDelete.id));
-    } catch (err: unknown) {
-      const msg =
-        (err as any)?.response?.data?.error ??
-        (err as any)?.response?.data?.message ??
-        'Failed to delete invoice.';
-      setError(msg);
-    } finally {
-      setDeletingId(null);
-    }
+  const handleResponseSaved = (incidentId: number, response: MyResponse) => {
+    setIncidents((prev) =>
+      prev.map((inc) =>
+        inc.id === incidentId ? { ...inc, my_response: response } : inc
+      )
+    );
   };
 
-  return (
-    <div className="space-y-6">
+  const respondedCount = incidents.filter((i) => i.my_response).length;
+  const pendingCount = incidents.length - respondedCount;
 
-      {/* ── Page Header ── */}
+  return (
+    <div className="space-y-5">
+
+      {/* ── Page header ── */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-              <FileText size={20} className="text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">My Defaults</h1>
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">My Defaults</h1>
+            {companyName && (
               <p className="text-sm text-gray-500 mt-0.5">
-                Your private invoice ledger — track payments and outstanding amounts.
+                Incidents filed against <span className="font-medium text-gray-700">{companyName}</span>
+                {gstn && <span className="font-mono text-xs text-gray-400 ml-2">({gstn})</span>}
               </p>
+            )}
+            <p className="text-sm text-gray-500 mt-1">
+              Review complaints filed against your company and submit your remark for each.
+            </p>
+          </div>
+        </div>
+
+        {/* Summary chips */}
+        {!loading && incidents.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-3">
+            <div className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-center min-w-[100px]">
+              <p className="text-xs text-gray-500">Total Incidents</p>
+              <p className="text-xl font-bold text-gray-900">{incidents.length}</p>
+            </div>
+            <div className="px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-center min-w-[100px]">
+              <p className="text-xs text-amber-600">Awaiting Response</p>
+              <p className="text-xl font-bold text-amber-700">{pendingCount}</p>
+            </div>
+            <div className="px-4 py-2 bg-green-50 border border-green-200 rounded-lg text-center min-w-[100px]">
+              <p className="text-xs text-green-600">Responded</p>
+              <p className="text-xl font-bold text-green-700">{respondedCount}</p>
             </div>
           </div>
-          <Link
-            to="/app/invoices/new"
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={16} />
-            Add Invoice
-          </Link>
+        )}
+      </div>
+
+      {/* ── How it works banner ── */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3">
+        <Info size={18} className="text-blue-500 shrink-0 mt-0.5" />
+        <div className="text-sm text-blue-800 space-y-1">
+          <p className="font-semibold">How My Defaults works</p>
+          <p>
+            Each card below is a complaint filed against your company. Expand a card to see the
+            invoice details provided by the complainant (read-only), then select the categories
+            that best explain your side and add a remark. Your response will be visible to
+            moderators and may be shown alongside the complaint.
+          </p>
         </div>
       </div>
 
-      {/* ── Summary KPIs ── */}
-      {!loading && invoices.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Invoices</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{invoices.length}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm border border-amber-200 p-4">
-            <p className="text-xs text-amber-600 font-medium uppercase tracking-wide">Pending</p>
-            <p className="text-2xl font-bold text-amber-700 mt-1">{pendingCount}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm border border-red-200 p-4">
-            <p className="text-xs text-red-600 font-medium uppercase tracking-wide">Overdue</p>
-            <p className="text-2xl font-bold text-red-700 mt-1">{overdueCount}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm border border-red-200 p-4">
-            <p className="text-xs text-red-600 font-medium uppercase tracking-wide">Total Unpaid</p>
-            <p className="text-xl font-bold text-red-700 mt-1">
-              ₹{totalUnpaid.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-            </p>
-          </div>
+      {/* ── Error ── */}
+      {error && (
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+          <AlertCircle size={16} className="shrink-0" />
+          {error}
         </div>
       )}
 
-      {/* ── Invoice Table ── */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-
-        {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertCircle size={16} className="shrink-0" />
-              <span>{error}</span>
-            </div>
-            <button
-              onClick={() => setError(null)}
-              className="ml-3 text-red-400 hover:text-red-600"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        )}
-
-        {/* Search + Filter */}
-        <div className="flex flex-wrap gap-3 mb-5">
-          <div className="relative flex-1 min-w-[220px]">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search invoice #, category, description…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
-          >
-            <option value="">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="paid">Paid</option>
-            <option value="overdue">Overdue</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+      {/* ── Loading ── */}
+      {loading && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-gray-400 text-sm">
+          Loading incidents…
         </div>
+      )}
 
-        {/* Table body */}
-        {loading ? (
-          <div className="py-16 text-center text-gray-400 text-sm">Loading your invoices…</div>
-        ) : filtered.length === 0 ? (
-          <div className="py-16 text-center">
-            <div className="text-4xl mb-3">📄</div>
-            <p className="text-gray-600 font-medium">
-              {invoices.length === 0 ? 'No invoices yet' : 'No invoices match your search'}
-            </p>
-            {invoices.length === 0 && (
-              <>
-                <p className="text-gray-400 text-sm mt-1">
-                  Add your first invoice to start tracking payments.
-                </p>
-                <Link
-                  to="/app/invoices/new"
-                  className="mt-4 inline-block px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Add First Invoice
-                </Link>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Invoice #', 'Amount', 'Issue Date', 'Due Date', 'Status', 'Category', 'Actions'].map((col) => (
-                    <th
-                      key={col}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      {col}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filtered.map((invoice) => {
-                  const cfg = statusConfig[invoice.status] ?? { bg: 'bg-gray-100', text: 'text-gray-600', label: invoice.status.toUpperCase() };
-                  const daysOverdue = invoice.status === 'overdue' ? daysSince(invoice.due_date) : 0;
-                  const isDeleting = deletingId === invoice.id;
+      {/* ── Empty state ── */}
+      {!loading && !error && incidents.length === 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <div className="text-4xl mb-3">✅</div>
+          <p className="text-gray-700 font-medium">No incidents filed against your company</p>
+          <p className="text-gray-400 text-sm mt-1">
+            This page will show incidents once a complaint is submitted against your company.
+          </p>
+        </div>
+      )}
 
-                  return (
-                    <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-4 text-sm font-medium">
-                        <Link
-                          to={`/app/invoices/${invoice.id}`}
-                          className="text-blue-600 hover:underline"
-                        >
-                          {invoice.invoice_number}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-900 font-medium whitespace-nowrap">
-                        ₹{Number(invoice.amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                        {invoice.amount_unpaid != null && invoice.amount_unpaid !== invoice.amount && (
-                          <span className="block text-xs text-gray-400 font-normal">
-                            ₹{Number(invoice.amount_unpaid).toLocaleString('en-IN', { maximumFractionDigits: 0 })} unpaid
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                        {new Date(invoice.issue_date).toLocaleDateString('en-IN')}
-                      </td>
-                      <td className="px-4 py-4 text-sm whitespace-nowrap">
-                        <span className={invoice.status === 'overdue' ? 'text-red-600 font-medium' : 'text-gray-600'}>
-                          {new Date(invoice.due_date).toLocaleDateString('en-IN')}
-                        </span>
-                        {daysOverdue > 0 && (
-                          <span className="block text-xs text-red-500">{daysOverdue}d overdue</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cfg.bg} ${cfg.text}`}>
-                          {cfg.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-600">
-                        {invoice.category || <span className="text-gray-400">—</span>}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <Link
-                            to={`/app/invoices/${invoice.id}`}
-                            className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                          >
-                            View
-                          </Link>
-                          <Link
-                            to={`/app/invoices/${invoice.id}/edit`}
-                            className="px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
-                          >
-                            Edit
-                          </Link>
-                          <button
-                            onClick={() => setConfirmDelete(invoice)}
-                            disabled={isDeleting}
-                            className="px-2.5 py-1 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
-                          >
-                            {isDeleting ? '…' : 'Delete'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* ── Help Note ── */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm text-blue-700">
-          <span className="font-semibold">About My Defaults:</span> These are private invoice records
-          linked to your company's transactions. They are not publicly visible and are only used
-          internally to support your incident reports.
-        </p>
-      </div>
-
-      {/* ── Delete Confirmation Modal ── */}
-      {confirmDelete && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
-            <h3 className="text-base font-semibold text-gray-900">Delete Invoice?</h3>
-            <p className="text-sm text-gray-600">
-              Are you sure you want to delete invoice{' '}
-              <span className="font-medium">"{confirmDelete.invoice_number}"</span>?
-              This action cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={handleDeleteConfirm}
-                className="flex-1 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Yes, Delete
-              </button>
-              <button
-                onClick={() => setConfirmDelete(null)}
-                className="flex-1 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
+      {/* ── Incident cards ── */}
+      {!loading && incidents.length > 0 && (
+        <div className="space-y-3">
+          {incidents.map((incident) => (
+            <IncidentCard
+              key={incident.id}
+              incident={incident}
+              gstn={gstn}
+              onResponseSaved={handleResponseSaved}
+            />
+          ))}
         </div>
       )}
     </div>

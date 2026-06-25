@@ -4,11 +4,12 @@ import { IncidentPenalty, IncidentPenaltyCreateInput } from '../models/IncidentP
 
 export class IncidentResponseRepository {
   async create(db: DbClient, data: IncidentResponseCreateInput): Promise<IncidentResponse> {
-    const { incident_id, responder_gstn, responder_name, response_text } = data;
+    const { incident_id, responder_gstn, responder_name, response_text, default_categories } = data;
     const result = await db.query(
-      `INSERT INTO incident_responses (incident_id, responder_gstn, responder_name, response_text)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [incident_id, responder_gstn, responder_name || null, response_text]
+      `INSERT INTO incident_responses
+         (incident_id, responder_gstn, responder_name, response_text, default_categories)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [incident_id, responder_gstn, responder_name || null, response_text, default_categories ?? []]
     );
     return result.rows[0];
   }

@@ -218,9 +218,9 @@ export class IncidentController {
 
   /**
    * GET /incidents/against-my-company
-   * Returns the count of approved/resolved incidents filed against
-   * the authenticated user's registered company.
-   * Used by the frontend to decide whether to show "My Defaults" in the nav.
+   * Returns all incidents filed against the authenticated user's company,
+   * including their attached invoices and any existing company responses.
+   * Also returns { count } for the nav-visibility check.
    */
   async againstMyCompany(c: Context<AppBindings>): Promise<Response> {
     const db = createDbClient(c.env.DATABASE_URL);
@@ -232,28 +232,107 @@ export class IncidentController {
 
       // Look up the user's registered company GSTN
       const companyResult = await db.query(
-        `SELECT gstn FROM company_profiles WHERE user_id = $1 LIMIT 1`,
+        `SELECT gstn, company_name FROM company_profiles WHERE user_id = $1 LIMIT 1`,
         [user.id]
       );
 
       if (!companyResult.rows[0]?.gstn) {
-        // User has no registered company — they cannot have incidents filed against them
-        return c.json({ count: 0 });
+        return c.json({ count: 0, incidents: [], gstn: null });
       }
 
       const gstn = companyResult.rows[0].gstn.trim().toUpperCase();
+      const companyName = companyResult.rows[0].company_name;
 
-      // Count incidents where the reported company GSTN matches and status is meaningful
-      const result = await db.query(
-        `SELECT COUNT(*)::int AS count
-           FROM incidents
-          WHERE UPPER(TRIM(company_gstn)) = $1
-            AND status IN ('submitted', 'under_review', 'approved', 'resolved')`,
+      // Fetch all incidents where the reported company matches
+      const incidentsResult = await db.query(
+        `SELECT
+           i.id,
+           i.company_gstn,
+           i.company_name,
+           i.incident_type,
+           i.incident_date,
+           i.incident_title,
+           i.description,
+           i.amount_involved,
+           i.currency_code,
+           i.status,
+           i.created_at
+         FROM incidents i
+         WHERE UPPER(TRIM(i.company_gstn)) = $1
+           AND i.status IN ('submitted', 'under_review', 'approved', 'resolved')
+         ORDER BY i.created_at DESC`,
         [gstn]
       );
 
-      const count = result.rows[0]?.count ?? 0;
-      return c.json({ count });
+      const incidents = incidentsResult.rows;
+
+      if (incidents.length === 0) {
+        return c.json({ count: 0, incidents: [], gstn, company_name: companyName });
+      }
+
+      const incidentIds = incidents.map((inc: any) => inc.id);
+
+      // Fetch invoices attached to these incidents
+      const invoicesResult = await db.query(
+        `SELECT
+           inv.id,
+           inv.incident_id,
+           inv.invoice_number,
+           inv.amount,
+           inv.amount_unpaid,
+           inv.issue_date,
+           inv.due_date,
+           inv.status,
+           inv.category,
+           inv.item_sold,
+           inv.description
+         FROM invoices inv
+         WHERE inv.incident_id = ANY($1::int[])
+         ORDER BY inv.issue_date`,
+        [incidentIds]
+      );
+
+      // Fetch existing company responses for these incidents
+      const responsesResult = await db.query(
+        `SELECT
+           ir.id,
+           ir.incident_id,
+           ir.response_text,
+           ir.default_categories,
+           ir.responded_at
+         FROM incident_responses ir
+         WHERE ir.incident_id = ANY($1::int[])
+           AND ir.responder_gstn = $2
+         ORDER BY ir.responded_at DESC`,
+        [incidentIds, gstn]
+      );
+
+      // Group invoices and responses by incident_id
+      const invoicesByIncident: Record<number, any[]> = {};
+      for (const inv of invoicesResult.rows) {
+        if (!invoicesByIncident[inv.incident_id]) invoicesByIncident[inv.incident_id] = [];
+        invoicesByIncident[inv.incident_id].push(inv);
+      }
+      const responsesByIncident: Record<number, any> = {};
+      for (const resp of responsesResult.rows) {
+        // Keep the most recent response per incident
+        if (!responsesByIncident[resp.incident_id]) {
+          responsesByIncident[resp.incident_id] = resp;
+        }
+      }
+
+      const enriched = incidents.map((inc: any) => ({
+        ...inc,
+        invoices: invoicesByIncident[inc.id] ?? [],
+        my_response: responsesByIncident[inc.id] ?? null,
+      }));
+
+      return c.json({
+        count: enriched.length,
+        gstn,
+        company_name: companyName,
+        incidents: enriched,
+      });
     } catch (error: any) {
       return c.json({ error: error.message }, 500);
     }

@@ -104,12 +104,14 @@ export class ModerationService {
     incidentId: number,
     responderGstn: string,
     responseText: string,
-    responderName?: string
+    responderName?: string,
+    defaultCategories?: string[]
   ): Promise<IncidentResponse> {
     const incident = await incidentRepository.findById(db, incidentId);
     if (!incident) throw new Error('Incident not found');
-    if (!['approved', 'resolved'].includes(incident.status)) {
-      throw new Error('Company responses can only be submitted for approved or resolved incidents');
+    // Allow responses for any non-draft, non-rejected status
+    if (!['submitted', 'under_review', 'approved', 'resolved'].includes(incident.status)) {
+      throw new Error('Company responses can only be submitted for active incidents');
     }
     if (incident.company_gstn !== responderGstn) {
       throw new Error('You can only respond to incidents about your own company');
@@ -121,6 +123,7 @@ export class ModerationService {
       responder_gstn: responderGstn,
       responder_name: responderName,
       response_text: responseText,
+      default_categories: defaultCategories ?? [],
     });
   }
 
