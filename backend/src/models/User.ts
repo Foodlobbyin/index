@@ -81,6 +81,10 @@ export interface UserResponse {
   trust_level: 'new' | 'basic' | 'verified' | 'trusted' | 'moderator' | 'admin';
   registration_status?: 'active' | 'pending_review' | 'waitlist' | 'declined';
   can_send_invites?: boolean;
+  /** Populated by findById via LEFT JOIN companies. TRUE when at least one
+   *  non-draft incident exists against the user's registered company GSTN.
+   *  Drives "My Defaults" nav-item visibility without an extra API call. */
+  has_incidents?: boolean;
   created_at: Date;
 }
 
