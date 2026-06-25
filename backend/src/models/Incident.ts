@@ -14,6 +14,13 @@ export type IncidentStatus =
   | 'rejected'
   | 'resolved';
 
+export interface CompanyResponse {
+  id: number;
+  response_text: string;
+  default_categories: string[];
+  responded_at: string;
+}
+
 export interface Incident {
   id: number;
   company_gstn?: string;
@@ -36,6 +43,8 @@ export interface Incident {
   rejection_reason?: string;
   created_at: Date;
   updated_at: Date;
+  /** Latest response submitted by the accused company via My Defaults page. */
+  company_response?: CompanyResponse | null;
 }
 
 export interface IncidentCreateInput {
