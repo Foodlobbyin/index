@@ -23,6 +23,7 @@ const INDIAN_STATES = [
 ];
 
 interface InvoiceRow {
+  invoice_number: string;
   invoice_amount: string;
   unpaid_amount: string;
   invoice_date: string;
@@ -55,6 +56,7 @@ interface FormData {
 }
 
 const emptyInvoice = (): InvoiceRow => ({
+  invoice_number: '',
   invoice_amount: '',
   unpaid_amount: '',
   invoice_date: '',
@@ -216,7 +218,7 @@ const ReportIncidentPage: React.FC = () => {
     }
     if (step === 2) {
       const hasInvoice = formData.invoices.some(
-        (inv) => inv.invoice_amount.trim() !== '' || inv.unpaid_amount.trim() !== ''
+        (inv) => inv.invoice_amount.trim() !== '' || inv.unpaid_amount.trim() !== '' || inv.invoice_number.trim() !== ''
       );
       if (!hasInvoice) {
         setError('Please enter at least one invoice with Invoice Amount or Unpaid Amount.');
@@ -483,6 +485,16 @@ const ReportIncidentPage: React.FC = () => {
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelClass}>Invoice / Bill No.</label>
+                          <input
+                            type="text"
+                            className={inputClass}
+                            placeholder="e.g. INV-2024-001"
+                            value={inv.invoice_number}
+                            onChange={(e) => handleInvoiceChange(idx, 'invoice_number', e.target.value)}
+                          />
+                        </div>
                         <div>
                           <label className={labelClass}>Invoice Amount (₹) <span className="text-red-500">*</span></label>
                           <input type="number" className={inputClass}
