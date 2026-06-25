@@ -205,7 +205,7 @@ const DashboardKPIs: React.FC = () => {
                   dataKey="unpaid_amount"
                   nameKey="state_name"
                   labelLine={false}
-                  label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                  label={({ cx, cy, midAngle = 0, innerRadius, outerRadius, percent = 0 }) => {
                     if (percent < 0.04) return null; // skip tiny slices
                     const RADIAN = Math.PI / 180;
                     const radius = innerRadius + (outerRadius - innerRadius) * 0.6;
