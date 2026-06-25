@@ -3,7 +3,7 @@ import type { AppBindings } from '../types/env';
 import incidentController from '../controllers/incident.controller';
 import moderationController from '../controllers/moderation.controller';
 import evidenceController from '../controllers/evidence.controller';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.middleware';
 import { uploadMiddleware } from '../middleware/upload.middleware';
 import { apiLimiter, createLimiter } from '../middleware/rateLimiter';
 import { requireMinTrustLevel } from '../middleware/trustLevel.middleware';
@@ -25,8 +25,8 @@ router.get('/my-reports', authMiddleware, incidentController.myReports);
 // Company rep route
 router.get('/company/:gstn', authMiddleware, incidentController.getByGstn);
 
-// Public incident detail
-router.get('/:id', incidentController.getById);
+// Public incident detail — optionalAuth so logged-in reporter gets reporter_id back
+router.get('/:id', optionalAuthMiddleware, incidentController.getById);
 
 // Authenticated user routes for specific incident
 // Submit a draft incident for moderation review (owner only, drafts only)
