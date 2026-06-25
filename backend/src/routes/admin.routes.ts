@@ -621,4 +621,181 @@ router.get('/analytics', async (c) => {
   });
 });
 
+
+/**
+ * PATCH /api/admin/users/:id/suspend
+ * Suspend a user (reversible). Sets registration_status = 'suspended'.
+ * Body: { reason?: string }
+ */
+router.patch('/users/:id/suspend', async (c) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+  const userId = parseInt(c.req.param('id'));
+  const actorId = c.get('user')?.id;
+
+  if (actorId === userId) {
+    return c.json({ error: 'You cannot suspend your own account.' }, 400);
+  }
+
+  const { reason } = await c.req.json().catch(() => ({ reason: '' }));
+
+  const user = await db.query('SELECT id, username, email, trust_level FROM users WHERE id = $1', [userId]);
+  if (!user.rows[0]) return c.json({ error: 'User not found.' }, 404);
+  if (user.rows[0].trust_level === 'admin') {
+    return c.json({ error: 'Admin accounts cannot be suspended.' }, 403);
+  }
+
+  await db.query(
+    `UPDATE users
+     SET registration_status = 'suspended',
+         account_activated   = FALSE,
+         moderation_note     = $1,
+         moderated_by        = $2,
+         moderated_at        = NOW()
+     WHERE id = $3`,
+    [reason || null, actorId, userId]
+  );
+
+  try {
+    await auditLogService.writeLog(db, {
+      action: 'USER_SUSPENDED',
+      entity_type: 'user',
+      entity_id: userId,
+      user_id: actorId ?? null,
+      details: { reason, target_username: user.rows[0].username },
+    });
+  } catch (_) {}
+
+  return c.json({ message: `User @${user.rows[0].username} has been suspended.` });
+});
+
+/**
+ * PATCH /api/admin/users/:id/ban
+ * Permanently ban a user. Sets registration_status = 'banned'.
+ * Body: { reason?: string }
+ */
+router.patch('/users/:id/ban', async (c) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+  const userId = parseInt(c.req.param('id'));
+  const actorId = c.get('user')?.id;
+
+  if (actorId === userId) {
+    return c.json({ error: 'You cannot ban your own account.' }, 400);
+  }
+
+  const { reason } = await c.req.json().catch(() => ({ reason: '' }));
+
+  const user = await db.query('SELECT id, username, email, trust_level FROM users WHERE id = $1', [userId]);
+  if (!user.rows[0]) return c.json({ error: 'User not found.' }, 404);
+  if (user.rows[0].trust_level === 'admin') {
+    return c.json({ error: 'Admin accounts cannot be banned.' }, 403);
+  }
+
+  await db.query(
+    `UPDATE users
+     SET registration_status = 'banned',
+         account_activated   = FALSE,
+         can_send_invites    = FALSE,
+         moderation_note     = $1,
+         moderated_by        = $2,
+         moderated_at        = NOW()
+     WHERE id = $3`,
+    [reason || null, actorId, userId]
+  );
+
+  try {
+    await auditLogService.writeLog(db, {
+      action: 'USER_BANNED',
+      entity_type: 'user',
+      entity_id: userId,
+      user_id: actorId ?? null,
+      details: { reason, target_username: user.rows[0].username },
+    });
+  } catch (_) {}
+
+  return c.json({ message: `User @${user.rows[0].username} has been permanently banned.` });
+});
+
+/**
+ * PATCH /api/admin/users/:id/unsuspend
+ * Restore a suspended user back to active.
+ */
+router.patch('/users/:id/unsuspend', async (c) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+  const userId = parseInt(c.req.param('id'));
+  const actorId = c.get('user')?.id;
+
+  const user = await db.query('SELECT id, username, registration_status FROM users WHERE id = $1', [userId]);
+  if (!user.rows[0]) return c.json({ error: 'User not found.' }, 404);
+  if (user.rows[0].registration_status !== 'suspended') {
+    return c.json({ error: 'User is not currently suspended.' }, 400);
+  }
+
+  await db.query(
+    `UPDATE users
+     SET registration_status = 'active',
+         account_activated   = TRUE,
+         moderation_note     = NULL,
+         moderated_by        = $1,
+         moderated_at        = NOW()
+     WHERE id = $2`,
+    [actorId, userId]
+  );
+
+  try {
+    await auditLogService.writeLog(db, {
+      action: 'USER_UNSUSPENDED',
+      entity_type: 'user',
+      entity_id: userId,
+      user_id: actorId ?? null,
+      details: { target_username: user.rows[0].username },
+    });
+  } catch (_) {}
+
+  return c.json({ message: `User @${user.rows[0].username} has been restored to active.` });
+});
+
+/**
+ * DELETE /api/admin/users/:id
+ * Hard-delete a user from the database (irreversible — for fake identity cases).
+ * Body: { confirm: true } — must be explicitly passed to prevent accidents.
+ */
+router.delete('/users/:id', async (c) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+  const userId = parseInt(c.req.param('id'));
+  const actorId = c.get('user')?.id;
+
+  if (actorId === userId) {
+    return c.json({ error: 'You cannot delete your own account.' }, 400);
+  }
+
+  const { confirm } = await c.req.json().catch(() => ({ confirm: false }));
+  if (!confirm) {
+    return c.json({ error: 'Deletion requires confirm: true in the request body.' }, 400);
+  }
+
+  const user = await db.query('SELECT id, username, email, trust_level FROM users WHERE id = $1', [userId]);
+  if (!user.rows[0]) return c.json({ error: 'User not found.' }, 404);
+  if (user.rows[0].trust_level === 'admin') {
+    return c.json({ error: 'Admin accounts cannot be deleted via this endpoint.' }, 403);
+  }
+
+  // Log before deleting (so we have a record)
+  try {
+    await auditLogService.writeLog(db, {
+      action: 'USER_DELETED',
+      entity_type: 'user',
+      entity_id: userId,
+      user_id: actorId ?? null,
+      details: {
+        deleted_username: user.rows[0].username,
+        deleted_email: user.rows[0].email,
+      },
+    });
+  } catch (_) {}
+
+  await db.query('DELETE FROM users WHERE id = $1', [userId]);
+
+  return c.json({ message: `User @${user.rows[0].username} has been permanently deleted.` });
+});
+
 export default router;

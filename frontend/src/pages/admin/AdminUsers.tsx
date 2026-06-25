@@ -14,6 +14,8 @@ interface User {
   email_verified: boolean;
   can_send_invites: boolean;
   created_at: string;
+  moderation_note?: string;
+  moderated_at?: string;
 }
 
 const TRUST_LEVELS = ['basic', 'verified', 'trusted', 'moderator', 'admin'];
@@ -25,6 +27,7 @@ const STATUS_FILTERS = [
   { key: 'pending_review', label: 'Pending' },
   { key: 'declined', label: 'Declined' },
   { key: 'suspended', label: 'Suspended' },
+  { key: 'banned', label: 'Banned' },
 ];
 
 const TRUST_COLORS: Record<string, string> = {
@@ -33,9 +36,142 @@ const TRUST_COLORS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  active: '#10b981', pending_review: '#f59e0b',
-  declined: '#ef4444', suspended: '#6b7280',
+  active: '#10b981',
+  pending_review: '#f59e0b',
+  declined: '#ef4444',
+  suspended: '#f97316',
+  banned: '#7f1d1d',
 };
+
+// ── Moderation Action Modal ───────────────────────────────────────────────────
+
+interface ModerationModalProps {
+  user: User;
+  action: 'suspend' | 'ban' | 'delete' | 'unsuspend';
+  onConfirm: (reason: string) => void;
+  onClose: () => void;
+}
+
+function ModerationModal({ user, action, onConfirm, onClose }: ModerationModalProps) {
+  const [reason, setReason] = useState('');
+
+  const config = {
+    suspend: {
+      title: 'Suspend User',
+      color: '#f97316',
+      bg: '#fff7ed',
+      border: '#fed7aa',
+      description: `Suspending @${user.username} will block their login immediately. This is reversible — you can restore them later.`,
+      requiresReason: true,
+      confirmLabel: 'Suspend User',
+    },
+    ban: {
+      title: 'Permanently Ban User',
+      color: '#dc2626',
+      bg: '#fef2f2',
+      border: '#fecaca',
+      description: `Banning @${user.username} permanently blocks their account and revokes invite privileges. Use for confirmed fake identities or repeat offenders.`,
+      requiresReason: true,
+      confirmLabel: 'Permanently Ban',
+    },
+    delete: {
+      title: 'Delete User Account',
+      color: '#991b1b',
+      bg: '#fef2f2',
+      border: '#fecaca',
+      description: `This will permanently delete @${user.username} and all associated data. This action CANNOT be undone. Use only for confirmed fake/fraudulent accounts.`,
+      requiresReason: false,
+      confirmLabel: 'Permanently Delete',
+    },
+    unsuspend: {
+      title: 'Restore User',
+      color: '#15803d',
+      bg: '#f0fdf4',
+      border: '#86efac',
+      description: `This will restore @${user.username} to active status and re-enable their login.`,
+      requiresReason: false,
+      confirmLabel: 'Restore Account',
+    },
+  }[action];
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.45)',
+        zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          backgroundColor: 'white', borderRadius: 12, padding: 28,
+          width: '100%', maxWidth: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+          border: `2px solid ${config.border}`,
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: config.color }}>{config.title}</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#9ca3af', padding: '0 4px', lineHeight: 1 }}>×</button>
+        </div>
+
+        <div style={{ backgroundColor: config.bg, border: `1px solid ${config.border}`, borderRadius: 8, padding: '12px 14px', marginBottom: 18 }}>
+          <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{config.description}</p>
+        </div>
+
+        {config.requiresReason && (
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Reason (optional but recommended)
+            </label>
+            <textarea
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder={`Why are you ${action === 'suspend' ? 'suspending' : 'banning'} this user?`}
+              rows={3}
+              style={{
+                width: '100%', padding: '9px 12px', borderRadius: 7,
+                border: '1px solid #d1d5db', fontSize: 13, resize: 'vertical',
+                outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
+              }}
+            />
+          </div>
+        )}
+
+        {action === 'delete' && (
+          <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', marginBottom: 18 }}>
+            <p style={{ margin: 0, fontSize: 12, color: '#991b1b', fontWeight: 600 }}>
+              ⚠ This is irreversible. The audit log will record this action for accountability.
+            </p>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1, padding: '10px', borderRadius: 7,
+              border: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
+              cursor: 'pointer', fontSize: 13, color: '#374151', fontWeight: 500,
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(reason)}
+            style={{
+              flex: 1, padding: '10px', borderRadius: 7,
+              border: 'none', backgroundColor: config.color,
+              cursor: 'pointer', fontSize: 13, color: 'white', fontWeight: 700,
+            }}
+          >
+            {config.confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── User Detail Modal ─────────────────────────────────────────────────────────
 
@@ -56,7 +192,6 @@ function UserModal({ user, onClose }: { user: User; onClose: () => void }) {
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Modal header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#111827' }}>
@@ -72,7 +207,6 @@ function UserModal({ user, onClose }: { user: User; onClose: () => void }) {
           </button>
         </div>
 
-        {/* Badges */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
           <span style={{
             padding: '3px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600,
@@ -95,7 +229,6 @@ function UserModal({ user, onClose }: { user: User; onClose: () => void }) {
           )}
         </div>
 
-        {/* Details grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px', marginBottom: 20 }}>
           {[
             { label: 'Email', value: user.email },
@@ -110,6 +243,18 @@ function UserModal({ user, onClose }: { user: User; onClose: () => void }) {
             </div>
           ))}
         </div>
+
+        {user.moderation_note && (
+          <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Moderation Note</p>
+            <p style={{ margin: 0, fontSize: 13, color: '#374151' }}>{user.moderation_note}</p>
+            {user.moderated_at && (
+              <p style={{ margin: '4px 0 0', fontSize: 11, color: '#9ca3af' }}>
+                {new Date(user.moderated_at).toLocaleString('en-IN')}
+              </p>
+            )}
+          </div>
+        )}
 
         <button
           onClick={onClose}
@@ -138,6 +283,10 @@ export default function AdminUsers(): JSX.Element {
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [moderationModal, setModerationModal] = useState<{
+    user: User;
+    action: 'suspend' | 'ban' | 'delete' | 'unsuspend';
+  } | null>(null);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -157,8 +306,6 @@ export default function AdminUsers(): JSX.Element {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  // Reset page when filters change
   useEffect(() => { setPage(1); }, [search, statusFilter, trustFilter]);
 
   const toggleInvites = async (user: User) => {
@@ -182,6 +329,40 @@ export default function AdminUsers(): JSX.Element {
       load();
     } catch (err: any) {
       showToast(err?.response?.data?.error || 'Failed to update trust level', false);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // ── Moderation actions ────────────────────────────────────────────────────
+
+  const openModerationModal = (user: User, action: 'suspend' | 'ban' | 'delete' | 'unsuspend') => {
+    setModerationModal({ user, action });
+  };
+
+  const executeModerationAction = async (reason: string) => {
+    if (!moderationModal) return;
+    const { user, action } = moderationModal;
+    setModerationModal(null);
+    setActionLoading(user.id);
+
+    try {
+      if (action === 'suspend') {
+        await api.patch(`/admin/users/${user.id}/suspend`, { reason });
+        showToast(`@${user.username} has been suspended`);
+      } else if (action === 'ban') {
+        await api.patch(`/admin/users/${user.id}/ban`, { reason });
+        showToast(`@${user.username} has been permanently banned`, true);
+      } else if (action === 'unsuspend') {
+        await api.patch(`/admin/users/${user.id}/unsuspend`);
+        showToast(`@${user.username} has been restored to active`);
+      } else if (action === 'delete') {
+        await api.delete(`/admin/users/${user.id}`, { data: { confirm: true } });
+        showToast(`@${user.username} has been permanently deleted`);
+      }
+      load();
+    } catch (err: any) {
+      showToast(err?.response?.data?.error || `Failed to ${action} user`, false);
     } finally {
       setActionLoading(null);
     }
@@ -234,6 +415,16 @@ export default function AdminUsers(): JSX.Element {
       {/* User detail modal */}
       {selectedUser && <UserModal user={selectedUser} onClose={() => setSelectedUser(null)} />}
 
+      {/* Moderation confirmation modal */}
+      {moderationModal && (
+        <ModerationModal
+          user={moderationModal.user}
+          action={moderationModal.action}
+          onConfirm={executeModerationAction}
+          onClose={() => setModerationModal(null)}
+        />
+      )}
+
       {/* Page header */}
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#111827' }}>Users</h1>
@@ -254,7 +445,9 @@ export default function AdminUsers(): JSX.Element {
               style={{
                 padding: '5px 14px', borderRadius: 16, border: 'none', cursor: 'pointer',
                 fontSize: 13, fontWeight: active ? 600 : 400,
-                backgroundColor: active ? '#15803d' : '#f3f4f6',
+                backgroundColor: active
+                  ? (key === 'suspended' ? '#f97316' : key === 'banned' ? '#dc2626' : '#15803d')
+                  : '#f3f4f6',
                 color: active ? 'white' : '#374151',
                 display: 'flex', alignItems: 'center', gap: 5,
               }}
@@ -326,76 +519,148 @@ export default function AdminUsers(): JSX.Element {
                 <th style={th}>Trust Level</th>
                 <th style={th}>Invites</th>
                 <th style={th}>Joined</th>
+                <th style={th}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {paginated.map(u => (
-                <tr
-                  key={u.id}
-                  onClick={() => setSelectedUser(u)}
-                  style={{ cursor: 'pointer', transition: 'background 0.1s' }}
-                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#fafafa')}
-                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <td style={td}>
-                    <div style={{ fontWeight: 600, color: '#111827', fontSize: 14 }}>{u.username}</div>
-                    <div style={{ fontSize: 12, color: '#9ca3af' }}>{u.email}</div>
-                    {(u.first_name || u.last_name) && (
-                      <div style={{ fontSize: 12, color: '#6b7280' }}>{u.first_name} {u.last_name}</div>
-                    )}
-                  </td>
-                  <td style={{ ...td, fontSize: 13, color: '#374151', fontFamily: 'monospace' }}>
-                    {u.gstn || <span style={{ color: '#d1d5db' }}>—</span>}
-                  </td>
-                  <td style={td}>
-                    <span style={{
-                      padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600,
-                      backgroundColor: (STATUS_COLORS[u.registration_status] || '#6b7280') + '20',
-                      color: STATUS_COLORS[u.registration_status] || '#6b7280',
-                    }}>
-                      {u.registration_status?.replace('_', ' ') || '—'}
-                    </span>
-                  </td>
-                  <td style={td} onClick={e => e.stopPropagation()}>
-                    <select
-                      value={u.trust_level}
-                      disabled={actionLoading === u.id}
-                      onChange={e => changeTrustLevel(u, e.target.value)}
-                      style={{
-                        padding: '4px 8px', borderRadius: 6,
-                        border: `1px solid ${TRUST_COLORS[u.trust_level] || '#d1d5db'}`,
-                        fontSize: 12, color: TRUST_COLORS[u.trust_level] || '#374151',
-                        backgroundColor: (TRUST_COLORS[u.trust_level] || '#6b7280') + '15',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {TRUST_LEVELS.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </td>
-                  <td style={td} onClick={e => e.stopPropagation()}>
-                    <div
-                      onClick={() => actionLoading !== u.id && toggleInvites(u)}
-                      style={{
-                        width: 36, height: 20, borderRadius: 10, position: 'relative',
-                        backgroundColor: u.can_send_invites ? '#15803d' : '#d1d5db',
-                        cursor: actionLoading === u.id ? 'not-allowed' : 'pointer',
-                        transition: 'background 0.2s',
-                      }}
-                    >
-                      <div style={{
-                        position: 'absolute', top: 2,
-                        left: u.can_send_invites ? 18 : 2,
-                        width: 16, height: 16, borderRadius: '50%',
-                        backgroundColor: 'white', transition: 'left 0.2s',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                      }} />
-                    </div>
-                  </td>
-                  <td style={{ ...td, fontSize: 12, color: '#9ca3af', whiteSpace: 'nowrap' }}>
-                    {new Date(u.created_at).toLocaleDateString('en-IN')}
-                  </td>
-                </tr>
-              ))}
+              {paginated.map(u => {
+                const isSuspended = u.registration_status === 'suspended';
+                const isBanned = u.registration_status === 'banned';
+                const isModerated = isSuspended || isBanned;
+                const rowBg = isBanned ? '#fff5f5' : isSuspended ? '#fffbf5' : 'transparent';
+
+                return (
+                  <tr
+                    key={u.id}
+                    style={{ cursor: 'pointer', transition: 'background 0.1s', backgroundColor: rowBg }}
+                    onMouseEnter={e => { if (!isModerated) e.currentTarget.style.backgroundColor = '#fafafa'; }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = rowBg; }}
+                  >
+                    <td style={td} onClick={() => setSelectedUser(u)}>
+                      <div style={{ fontWeight: 600, color: '#111827', fontSize: 14 }}>{u.username}</div>
+                      <div style={{ fontSize: 12, color: '#9ca3af' }}>{u.email}</div>
+                      {(u.first_name || u.last_name) && (
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>{u.first_name} {u.last_name}</div>
+                      )}
+                    </td>
+                    <td style={{ ...td, fontSize: 13, color: '#374151', fontFamily: 'monospace' }} onClick={() => setSelectedUser(u)}>
+                      {u.gstn || <span style={{ color: '#d1d5db' }}>—</span>}
+                    </td>
+                    <td style={td} onClick={() => setSelectedUser(u)}>
+                      <span style={{
+                        padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600,
+                        backgroundColor: (STATUS_COLORS[u.registration_status] || '#6b7280') + '20',
+                        color: STATUS_COLORS[u.registration_status] || '#6b7280',
+                      }}>
+                        {u.registration_status?.replace('_', ' ') || '—'}
+                      </span>
+                    </td>
+                    <td style={td} onClick={e => e.stopPropagation()}>
+                      <select
+                        value={u.trust_level}
+                        disabled={actionLoading === u.id || isBanned}
+                        onChange={e => changeTrustLevel(u, e.target.value)}
+                        style={{
+                          padding: '4px 8px', borderRadius: 6,
+                          border: `1px solid ${TRUST_COLORS[u.trust_level] || '#d1d5db'}`,
+                          fontSize: 12, color: TRUST_COLORS[u.trust_level] || '#374151',
+                          backgroundColor: (TRUST_COLORS[u.trust_level] || '#6b7280') + '15',
+                          cursor: isBanned ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        {TRUST_LEVELS.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </td>
+                    <td style={td} onClick={e => e.stopPropagation()}>
+                      <div
+                        onClick={() => actionLoading !== u.id && !isBanned && toggleInvites(u)}
+                        style={{
+                          width: 36, height: 20, borderRadius: 10, position: 'relative',
+                          backgroundColor: u.can_send_invites ? '#15803d' : '#d1d5db',
+                          cursor: (actionLoading === u.id || isBanned) ? 'not-allowed' : 'pointer',
+                          opacity: isBanned ? 0.5 : 1,
+                          transition: 'background 0.2s',
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute', top: 2,
+                          left: u.can_send_invites ? 18 : 2,
+                          width: 16, height: 16, borderRadius: '50%',
+                          backgroundColor: 'white', transition: 'left 0.2s',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        }} />
+                      </div>
+                    </td>
+                    <td style={{ ...td, fontSize: 12, color: '#9ca3af', whiteSpace: 'nowrap' }} onClick={() => setSelectedUser(u)}>
+                      {new Date(u.created_at).toLocaleDateString('en-IN')}
+                    </td>
+                    {/* ── Action Buttons ── */}
+                    <td style={{ ...td, whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                        {isSuspended ? (
+                          /* Restore button for suspended users */
+                          <button
+                            disabled={actionLoading === u.id}
+                            onClick={() => openModerationModal(u, 'unsuspend')}
+                            title="Restore account"
+                            style={{
+                              padding: '4px 10px', borderRadius: 5, border: '1px solid #86efac',
+                              backgroundColor: '#f0fdf4', color: '#15803d',
+                              cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                            }}
+                          >
+                            Restore
+                          </button>
+                        ) : !isBanned ? (
+                          /* Suspend button for active users */
+                          <button
+                            disabled={actionLoading === u.id}
+                            onClick={() => openModerationModal(u, 'suspend')}
+                            title="Suspend user"
+                            style={{
+                              padding: '4px 10px', borderRadius: 5, border: '1px solid #fed7aa',
+                              backgroundColor: '#fff7ed', color: '#c2410c',
+                              cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                            }}
+                          >
+                            Suspend
+                          </button>
+                        ) : null}
+
+                        {!isBanned && (
+                          /* Ban button for non-banned users */
+                          <button
+                            disabled={actionLoading === u.id}
+                            onClick={() => openModerationModal(u, 'ban')}
+                            title="Permanently ban"
+                            style={{
+                              padding: '4px 10px', borderRadius: 5, border: '1px solid #fecaca',
+                              backgroundColor: '#fef2f2', color: '#dc2626',
+                              cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                            }}
+                          >
+                            Ban
+                          </button>
+                        )}
+
+                        {/* Delete button — always available (except admin) */}
+                        <button
+                          disabled={actionLoading === u.id}
+                          onClick={() => openModerationModal(u, 'delete')}
+                          title="Permanently delete account"
+                          style={{
+                            padding: '4px 8px', borderRadius: 5, border: '1px solid #e5e7eb',
+                            backgroundColor: '#f9fafb', color: '#6b7280',
+                            cursor: 'pointer', fontSize: 13, fontWeight: 600, lineHeight: 1,
+                          }}
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -455,7 +720,7 @@ export default function AdminUsers(): JSX.Element {
       </div>
 
       <p style={{ marginTop: 8, fontSize: 12, color: '#d1d5db' }}>
-        Click any row to see full user details.
+        Click any row to see full user details. Suspended rows are highlighted in orange, banned in red.
       </p>
     </div>
   );
