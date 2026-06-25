@@ -215,6 +215,49 @@ export class IncidentController {
       return c.json({ error: error.message }, 400);
     }
   }
+
+  /**
+   * GET /incidents/against-my-company
+   * Returns the count of approved/resolved incidents filed against
+   * the authenticated user's registered company.
+   * Used by the frontend to decide whether to show "My Defaults" in the nav.
+   */
+  async againstMyCompany(c: Context<AppBindings>): Promise<Response> {
+    const db = createDbClient(c.env.DATABASE_URL);
+    try {
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ error: 'Authentication required' }, 401);
+      }
+
+      // Look up the user's registered company GSTN
+      const companyResult = await db.query(
+        `SELECT gstn FROM company_profiles WHERE user_id = $1 LIMIT 1`,
+        [user.id]
+      );
+
+      if (!companyResult.rows[0]?.gstn) {
+        // User has no registered company — they cannot have incidents filed against them
+        return c.json({ count: 0 });
+      }
+
+      const gstn = companyResult.rows[0].gstn.trim().toUpperCase();
+
+      // Count incidents where the reported company GSTN matches and status is meaningful
+      const result = await db.query(
+        `SELECT COUNT(*)::int AS count
+           FROM incidents
+          WHERE UPPER(TRIM(company_gstn)) = $1
+            AND status IN ('submitted', 'under_review', 'approved', 'resolved')`,
+        [gstn]
+      );
+
+      const count = result.rows[0]?.count ?? 0;
+      return c.json({ count });
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500);
+    }
+  }
 }
 
 export default new IncidentController();

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import Layout from '../components/Layout';
 import { invoiceService, InvoiceInput } from '../services/invoiceService';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
 
 export default function InvoiceEditPage(): JSX.Element {
   const { id } = useParams<{ id: string }>();
@@ -34,7 +34,7 @@ export default function InvoiceEditPage(): JSX.Element {
         description: data.description || '',
         category: data.category || '',
       });
-    } catch (err: any) {
+    } catch {
       setError('Failed to load invoice');
     } finally {
       setLoading(false);
@@ -67,111 +67,58 @@ export default function InvoiceEditPage(): JSX.Element {
     }
   };
 
-  const cardStyle: React.CSSProperties = {
-    backgroundColor: 'white',
-    padding: '30px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-  };
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '12px',
-    marginBottom: '15px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px',
-    boxSizing: 'border-box',
-  };
-
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    marginBottom: '4px',
-    fontWeight: '600',
-    color: '#2c3e50',
-    fontSize: '14px',
-  };
-
-  const buttonStyle: React.CSSProperties = {
-    padding: '12px 30px',
-    backgroundColor: '#3498db',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: '16px',
-    cursor: saving ? 'not-allowed' : 'pointer',
-    opacity: saving ? 0.6 : 1,
-  };
-
-  const cancelStyle: React.CSSProperties = {
-    padding: '12px 30px',
-    backgroundColor: '#95a5a6',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: '16px',
-    cursor: 'pointer',
-    textDecoration: 'none',
-    display: 'inline-block',
-    marginLeft: '10px',
-  };
-
-  const errorStyle: React.CSSProperties = {
-    backgroundColor: '#e74c3c',
-    color: 'white',
-    padding: '10px',
-    borderRadius: '4px',
-    marginBottom: '15px',
-  };
-
-  const gridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: '20px',
-  };
+  const inputCls =
+    'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400';
+  const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
 
   if (loading) {
     return (
-      <Layout>
-        <div style={cardStyle}>
-          <p style={{ textAlign: 'center', color: '#7f8c8d', padding: '40px' }}>Loading invoice…</p>
-        </div>
-      </Layout>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-400 text-sm">
+        Loading invoice…
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px', gap: '12px' }}>
-          <Link
-            to={`/app/invoices/${id}`}
-            style={{ color: '#3498db', textDecoration: 'none', fontSize: '14px' }}
-          >
-            ← Back to Invoice
-          </Link>
-        </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <Link
+          to={`/app/invoices/${id}`}
+          className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline mb-4"
+        >
+          <ArrowLeft size={15} />
+          Back to Invoice
+        </Link>
+        <h1 className="text-xl font-semibold text-gray-900">Edit Invoice</h1>
+        <p className="text-sm text-gray-500 mt-1">Update the details of this invoice.</p>
+      </div>
 
-        <h1 style={{ color: '#2c3e50', marginBottom: '30px', marginTop: 0 }}>Edit Invoice</h1>
+      {/* Form */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        {error && (
+          <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 mb-5">
+            <AlertCircle size={16} className="shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
 
-        {error && <div style={errorStyle}>{error}</div>}
-
-        <form onSubmit={handleSubmit}>
-          <div style={gridStyle}>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <label style={labelStyle}>Invoice Number *</label>
+              <label className={labelCls}>Invoice Number *</label>
               <input
                 type="text"
                 name="invoice_number"
                 value={formData.invoice_number}
                 onChange={handleChange}
                 required
-                style={inputStyle}
+                className={inputCls}
                 disabled={saving}
               />
             </div>
             <div>
-              <label style={labelStyle}>Invoice Amount *</label>
+              <label className={labelCls}>Invoice Amount (₹) *</label>
               <input
                 type="number"
                 name="amount"
@@ -181,12 +128,12 @@ export default function InvoiceEditPage(): JSX.Element {
                 required
                 step="0.01"
                 min="0"
-                style={inputStyle}
+                className={inputCls}
                 disabled={saving}
               />
             </div>
             <div>
-              <label style={labelStyle}>Amount Unpaid</label>
+              <label className={labelCls}>Amount Unpaid (₹)</label>
               <input
                 type="number"
                 name="amount_unpaid"
@@ -195,44 +142,42 @@ export default function InvoiceEditPage(): JSX.Element {
                 onChange={handleChange}
                 step="0.01"
                 min="0"
-                style={inputStyle}
+                className={inputCls}
                 disabled={saving}
               />
-              <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '-10px', marginBottom: '10px' }}>
-                Leave blank if the full amount is unpaid.
-              </p>
+              <p className="text-xs text-gray-400 mt-1">Leave blank if the full amount is unpaid.</p>
             </div>
             <div>
-              <label style={labelStyle}>Issue Date *</label>
+              <label className={labelCls}>Issue Date *</label>
               <input
                 type="date"
                 name="issue_date"
                 value={formData.issue_date}
                 onChange={handleChange}
                 required
-                style={inputStyle}
+                className={inputCls}
                 disabled={saving}
               />
             </div>
             <div>
-              <label style={labelStyle}>Due Date *</label>
+              <label className={labelCls}>Due Date *</label>
               <input
                 type="date"
                 name="due_date"
                 value={formData.due_date}
                 onChange={handleChange}
                 required
-                style={inputStyle}
+                className={inputCls}
                 disabled={saving}
               />
             </div>
             <div>
-              <label style={labelStyle}>Status</label>
+              <label className={labelCls}>Status</label>
               <select
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
-                style={inputStyle}
+                className={inputCls}
                 disabled={saving}
               >
                 <option value="pending">Pending</option>
@@ -242,42 +187,49 @@ export default function InvoiceEditPage(): JSX.Element {
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Category</label>
+              <label className={labelCls}>Category</label>
               <input
                 type="text"
                 name="category"
                 placeholder="e.g. Services, Products"
                 value={formData.category}
                 onChange={handleChange}
-                style={inputStyle}
+                className={inputCls}
                 disabled={saving}
               />
             </div>
           </div>
 
           <div>
-            <label style={labelStyle}>Description</label>
+            <label className={labelCls}>Description</label>
             <textarea
               name="description"
               placeholder="Optional description or notes"
               value={formData.description}
               onChange={handleChange}
               rows={4}
-              style={{ ...inputStyle, resize: 'vertical' }}
+              className={`${inputCls} resize-vertical`}
               disabled={saving}
             />
           </div>
 
-          <div style={{ marginTop: '10px' }}>
-            <button type="submit" style={buttonStyle} disabled={saving}>
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
               {saving ? 'Saving…' : 'Save Changes'}
             </button>
-            <Link to={`/app/invoices/${id}`} style={cancelStyle}>
+            <Link
+              to={`/app/invoices/${id}`}
+              className="px-6 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+            >
               Cancel
             </Link>
           </div>
         </form>
       </div>
-    </Layout>
+    </div>
   );
 }

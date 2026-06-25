@@ -21,6 +21,8 @@ router.post('/submit', authMiddleware, requireMinTrustLevel('verified'), createL
 
 // Authenticated user routes - order matters: specific paths before parameterised
 router.get('/my-reports', authMiddleware, incidentController.myReports);
+// Returns count of incidents filed against the authenticated user's own company
+router.get('/against-my-company', authMiddleware, incidentController.againstMyCompany);
 
 // Company rep route
 router.get('/company/:gstn', authMiddleware, incidentController.getByGstn);

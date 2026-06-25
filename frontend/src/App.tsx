@@ -16,10 +16,6 @@ import CompanyProfile from './pages/CompanyProfile';
 import CompanyView from './pages/CompanyView';
 import ContactPersonPage from './pages/ContactPersonPage';
 import InsightsPage from './pages/InsightsPage';
-import InvoiceList from './pages/InvoiceList';
-import InvoiceCreatePage from './pages/InvoiceCreatePage';
-import InvoiceDetailPage from './pages/InvoiceDetailPage';
-import InvoiceEditPage from './pages/InvoiceEditPage';
 import AdminPanel from './pages/admin/AdminPanel';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -94,41 +90,10 @@ export default function App(): JSX.Element {
             }
           />
 
-          {/* Protected invoice routes */}
-          <Route
-            path="/app/invoices"
-            element={
-              <ProtectedRoute>
-                <InvoiceList />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/app/invoices/new"
-            element={
-              <ProtectedRoute>
-                <InvoiceCreatePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/app/invoices/:id/edit"
-            element={
-              <ProtectedRoute>
-                <InvoiceEditPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/app/invoices/:id"
-            element={
-              <ProtectedRoute>
-                <InvoiceDetailPage />
-              </ProtectedRoute>
-            }
-          />
+          {/* /app/invoices redirects to /app/defaults — all invoice sub-routes are handled inside AppShell */}
+          <Route path="/app/invoices" element={<Navigate to="/app/defaults" replace />} />
 
-          {/* Protected app shell (catch-all for /app/*) */}
+          {/* Protected app shell (catch-all for /app/*) — handles /app/defaults, /app/invoices/:id, etc. */}
           <Route
             path="/app/*"
             element={

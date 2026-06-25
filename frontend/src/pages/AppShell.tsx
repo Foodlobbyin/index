@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, Navigate, NavLink, Routes, Route, useLocation } from 'react-router-dom';
 import { Search, MessageSquare, LogOut, User, ClipboardList, Shield, FileText, Settings, KeyRound, BookOpen, BarChart2, Newspaper } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,17 +12,43 @@ import ReportIncidentPage from './ReportIncidentPage';
 import IncidentDetailPage from './IncidentDetailPage';
 import ModerationQueuePage from './ModerationQueuePage';
 import MyIncidentsPage from './MyIncidentsPage';
+import MyDefaultsPage from './MyDefaultsPage';
+import InvoiceCreatePage from './InvoiceCreatePage';
+import InvoiceDetailPage from './InvoiceDetailPage';
+import InvoiceEditPage from './InvoiceEditPage';
 
 const AUDIT_LOG_TRUST_LEVELS: ReadonlyArray<'moderator' | 'admin'> = ['moderator', 'admin'];
 
 const AppShell: React.FC = () => {
   const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [hasIncidentAgainstUser, setHasIncidentAgainstUser] = useState(false);
   const location = useLocation();
 
   const canAccessAuditLogs = !!user?.trust_level && AUDIT_LOG_TRUST_LEVELS.includes(user.trust_level);
   const isModerator = canAccessAuditLogs;
   const isAdmin = user?.trust_level === 'admin';
+
+  // Check if any approved/resolved incident has been filed against the user's company.
+  // "My Defaults" is only shown when the user has skin in the game (someone reported them).
+  useEffect(() => {
+    if (!user) return;
+    const check = async () => {
+      try {
+        const { default: api } = await import('../services/api');
+        const res = await api.get('/incidents/against-my-company');
+        const data = res.data;
+        // Endpoint returns { count: N } or an array
+        const count = Array.isArray(data) ? data.length : (data?.count ?? data?.total ?? 0);
+        setHasIncidentAgainstUser(count > 0);
+      } catch {
+        // If endpoint doesn't exist yet, fall back to showing for admin/moderator only
+        setHasIncidentAgainstUser(isAdmin || isModerator);
+      }
+    };
+    check();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const tabs = [
     { id: 'search', label: 'Search', icon: <Search size={18} /> },
@@ -85,10 +111,12 @@ const AppShell: React.FC = () => {
                   <span>Moderation</span>
                 </NavLink>
               )}
-              <NavLink to="/app/invoices" className={navLinkClass}>
-                <FileText size={16} />
-                <span>My Defaults</span>
-              </NavLink>
+              {(hasIncidentAgainstUser || isAdmin) && (
+                <NavLink to="/app/defaults" className={navLinkClass}>
+                  <FileText size={16} />
+                  <span>My Defaults</span>
+                </NavLink>
+              )}
               {isAdmin && (
                 <a
                   href="/admin"
@@ -196,6 +224,19 @@ const AppShell: React.FC = () => {
           <Route path="incidents/:id" element={<IncidentDetailPage />} />
           {/* My Reports */}
           <Route path="my-incidents" element={<MyIncidentsPage />} />
+          {/* My Defaults — private invoice ledger, only for users with incidents against their company */}
+          <Route
+            path="defaults"
+            element={
+              (hasIncidentAgainstUser || isAdmin)
+                ? <MyDefaultsPage />
+                : <Navigate to="/app" replace />
+            }
+          />
+          {/* Invoice create / detail / edit — live inside AppShell so they share the nav header */}
+          <Route path="invoices/new" element={<InvoiceCreatePage />} />
+          <Route path="invoices/:id/edit" element={<InvoiceEditPage />} />
+          <Route path="invoices/:id" element={<InvoiceDetailPage />} />
           {/* Moderation */}
           <Route
             path="moderation"
