@@ -45,9 +45,9 @@ router.post('/', async (c) => {
       const fields: string[] = [];
       const vals: any[] = [];
       let idx = 1;
-      const allowed = ['company_gstn','company_name','state','pincode','street_address',
-        'msme_udyam_number','incident_type','incident_date','incident_title','description',
-        'amount_involved','currency_code'];
+      // Only columns that exist on the incidents table (state/pincode/street_address/msme_udyam_number are on companies)
+      const allowed = ['company_gstn','company_name','incident_type','incident_date',
+        'incident_title','description','amount_involved','currency_code'];
       for (const key of allowed) {
         if (new_data[key] !== undefined) {
           fields.push(`${key} = $${idx++}`);
@@ -60,6 +60,28 @@ router.post('/', async (c) => {
         await db.query(
           `UPDATE incidents SET ${fields.join(', ')} WHERE id = $${idx}`,
           vals
+        );
+      }
+
+      // Update company record for address/state fields (these live on companies, not incidents)
+      if (new_data.company_gstn || new_data.company_name) {
+        await db.query(
+          `UPDATE companies SET
+            company_name = COALESCE($1, company_name),
+            state = COALESCE($2, state),
+            pincode = COALESCE($3, pincode),
+            street_address = COALESCE($4, street_address),
+            msme_udyam_number = COALESCE($5, msme_udyam_number),
+            updated_at = NOW()
+           WHERE gstn = $6`,
+          [
+            new_data.company_name || null,
+            new_data.state || null,
+            new_data.pincode || null,
+            new_data.street_address || null,
+            new_data.msme_udyam_number || null,
+            new_data.company_gstn || incident.company_gstn
+          ]
         );
       }
 
@@ -232,23 +254,43 @@ router.put('/:id/approve', requireMinTrustLevel('moderator'), async (c) => {
     if (!editResult.rows[0]) return c.json({ error: 'Pending edit not found or already processed' }, 404);
     const edit = editResult.rows[0];
 
-    // Apply new core fields to incident
+    // Apply new core fields to incident (only columns that exist on incidents table)
     await db.query(
       `UPDATE incidents SET
-        company_gstn = $1, company_name = $2, state = $3, pincode = $4,
-        street_address = $5, msme_udyam_number = $6, incident_type = $7,
-        incident_date = $8, incident_title = $9, description = $10,
-        amount_involved = $11, currency_code = $12,
+        company_gstn = $1, company_name = $2, incident_type = $3,
+        incident_date = $4, incident_title = $5, description = $6,
+        amount_involved = $7, currency_code = $8,
         updated_at = NOW()
-       WHERE id = $13`,
+       WHERE id = $9`,
       [
-        edit.new_company_gstn, edit.new_company_name, edit.new_state, edit.new_pincode,
-        edit.new_street_address, edit.new_msme_udyam_number, edit.new_incident_type,
+        edit.new_company_gstn, edit.new_company_name, edit.new_incident_type,
         edit.new_incident_date, edit.new_incident_title, edit.new_description,
         edit.new_amount_involved, edit.new_currency_code,
         edit.incident_id
       ]
     );
+
+    // Also update the linked company record for address/state fields
+    if (edit.new_company_gstn || edit.new_company_name) {
+      await db.query(
+        `UPDATE companies SET
+          company_name = COALESCE($1, company_name),
+          state = COALESCE($2, state),
+          pincode = COALESCE($3, pincode),
+          street_address = COALESCE($4, street_address),
+          msme_udyam_number = COALESCE($5, msme_udyam_number),
+          updated_at = NOW()
+         WHERE gstn = $6`,
+        [
+          edit.new_company_name || null,
+          edit.new_state || null,
+          edit.new_pincode || null,
+          edit.new_street_address || null,
+          edit.new_msme_udyam_number || null,
+          edit.new_company_gstn || edit.old_company_gstn
+        ]
+      );
+    }
 
     // Replace invoices with new_invoices
     const newInvoices = Array.isArray(edit.new_invoices) ? edit.new_invoices : JSON.parse(edit.new_invoices || '[]');
@@ -256,8 +298,8 @@ router.put('/:id/approve', requireMinTrustLevel('moderator'), async (c) => {
     for (const inv of newInvoices) {
       if (!inv.invoice_amount && !inv.unpaid_amount) continue;
       await db.query(
-        `INSERT INTO incident_invoices (incident_id, invoice_amount, unpaid_amount, invoice_date, due_date, item_sold, currency_code)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        `INSERT INTO incident_invoices (incident_id, invoice_number, invoice_amount, unpaid_amount, invoice_date, due_date, item_sold, currency_code)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [edit.incident_id, inv.invoice_number?.trim() || null, inv.invoice_amount || null, inv.unpaid_amount || null,
          inv.invoice_date || null, inv.due_date || null, inv.item_sold || null,
          inv.currency_code || edit.new_currency_code || 'INR']
