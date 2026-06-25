@@ -120,6 +120,16 @@ export class IncidentRepository {
     );
     const incident = result.rows[0];
 
+    // Mark the reported company as having incidents so the accused user2019s
+    // "My Defaults" nav item becomes visible without a live COUNT query.
+    // Fire-and-forget: failure must not block incident creation.
+    if (companyId) {
+      db.query(
+        `UPDATE companies SET has_incidents = TRUE, updated_at = NOW() WHERE id = $1 AND has_incidents = FALSE`,
+        [companyId]
+      ).catch(() => { /* non-critical */ });
+    }
+
     // 2. Save each invoice to incident_invoices table
     if (Array.isArray(invoiceList) && invoiceList.length > 0) {
       for (const inv of invoiceList) {
@@ -220,6 +230,16 @@ export class IncidentRepository {
     const result = await db.query('SELECT * FROM incidents WHERE id = $1', [id]);
     if (!result.rows[0]) return null;
     const incident = result.rows[0];
+
+    // Mark the reported company as having incidents so the accused user2019s
+    // "My Defaults" nav item becomes visible without a live COUNT query.
+    // Fire-and-forget: failure must not block incident creation.
+    if (companyId) {
+      db.query(
+        `UPDATE companies SET has_incidents = TRUE, updated_at = NOW() WHERE id = $1 AND has_incidents = FALSE`,
+        [companyId]
+      ).catch(() => { /* non-critical */ });
+    }
 
     // Fetch linked invoices
     const invoicesResult = await db.query(
