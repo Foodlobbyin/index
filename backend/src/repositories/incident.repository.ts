@@ -128,7 +128,7 @@ export class IncidentRepository {
         if (!invAmt && !unpAmt) continue; // skip blank rows
         await db.query(
           `INSERT INTO incident_invoices
-             (incident_id, invoice_amount, unpaid_amount, invoice_date, due_date, item_sold, currency_code)
+             (incident_id, invoice_number, invoice_amount, unpaid_amount, invoice_date, due_date, item_sold, currency_code)
            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [
             incident.id,
