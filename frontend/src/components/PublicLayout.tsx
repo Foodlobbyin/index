@@ -22,7 +22,7 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-2">
               <img src="/logo-mark.png" alt="FoodLobby" className="h-10 w-auto" />
-              <img src="/logo-wordmark.png" alt="FoodLobby" className="h-7 w-auto" />
+              <img src="/logo-wordmark.png" alt="FoodLobby" style={{ height: '24px', width: 'auto' }} />
             </Link>
 
             {/* Desktop Navigation */}
@@ -100,7 +100,7 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
             <div>
               <div className="mb-3 flex items-center space-x-2">
                 <img src="/logo-mark.png" alt="FoodLobby" style={{ height: 28, width: 'auto' }} />
-                <img src="/logo-wordmark.png" alt="FoodLobby" style={{ height: 20, width: 'auto' }} />
+                <img src="/logo-wordmark.png" alt="FoodLobby" style={{ height: 17, width: 'auto' }} />
               </div>
               <p className="text-gray-400 text-sm leading-relaxed">
                 A community-driven platform to report trade fraud, credit defaults, and

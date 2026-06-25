@@ -84,7 +84,7 @@ const AppShell: React.FC = () => {
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-2 shrink-0">
               <img src="/logo-mark.png" alt="FoodLobby" className="h-9 w-auto" />
-              <img src="/logo-wordmark.png" alt="FoodLobby" className="h-6 w-auto" />
+              <img src="/logo-wordmark.png" alt="FoodLobby" style={{ height: '22px', width: 'auto' }} />
             </Link>
 
             {/* Nav links */}
