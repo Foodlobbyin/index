@@ -191,7 +191,17 @@ const AppShell: React.FC = () => {
                   <>
                     {activeTab === 'search' && <SearchSubmitSection />}
                     {activeTab === 'stats' && <DashboardKPIs />}
-                    {activeTab === 'forum' && <ForumSection />}
+                    {activeTab === 'forum' && (
+                      // FORUM_COMING_SOON — replace this block with <ForumSection /> when ready to go live
+                      <div className="flex flex-col items-center justify-center py-24 text-center">
+                        <div className="text-5xl mb-4">🏗️</div>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-2">Industry Forum</h2>
+                        <p className="text-gray-500 text-base max-w-md">
+                          Coming Soon — a dedicated space for commodity professionals to discuss trade, share insights, and stay ahead.
+                        </p>
+                      </div>
+                      // END FORUM_COMING_SOON
+                    )}
                     {activeTab === 'insider' && <InsiderSection />}
                     {activeTab === 'activitylog' && (
                       canAccessAuditLogs ? <AuditLogPage /> : <Navigate to="/app" replace />

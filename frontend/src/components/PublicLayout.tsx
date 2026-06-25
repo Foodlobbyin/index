@@ -35,6 +35,7 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               >
                 Home
               </Link>
+              {/* NEWS_NAV_DESKTOP — uncomment to re-enable Alerts & Updates in desktop nav
               <Link
                 to="/news"
                 className={`${
@@ -43,6 +44,7 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               >
                 Alerts & Updates
               </Link>
+              */
               <Link to="/login">
                 <Button className="bg-green-700 hover:bg-green-800 text-white">
                   Member Sign In
@@ -71,6 +73,7 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               >
                 Home
               </Link>
+              {/* NEWS_NAV_MOBILE — uncomment to re-enable Alerts & Updates in mobile nav
               <Link
                 to="/news"
                 className={`block ${
@@ -80,6 +83,7 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               >
                 Alerts & Updates
               </Link>
+              */
               <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
                 <Button fullWidth className="bg-green-700 hover:bg-green-800 text-white">
                   Member Sign In
@@ -118,11 +122,13 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
                     Home
                   </Link>
                 </li>
+                {/* NEWS_FOOTER — uncomment to re-enable Alerts & Updates in footer
                 <li>
                   <Link to="/news" className="text-gray-400 hover:text-white transition-colors">
                     Alerts &amp; Updates
                   </Link>
                 </li>
+                */
                 <li>
                   <Link to="/login" className="text-gray-400 hover:text-white transition-colors">
                     Member Sign In
