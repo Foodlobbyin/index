@@ -154,7 +154,7 @@ export default function IncidentDetailPage(): JSX.Element {
       currency_code: i.currency_code ?? 'INR',
     })));
     if (editInvoices.length === 0 && invs.length === 0) {
-      setEditInvoices([{ invoice_amount:'', unpaid_amount:'', invoice_date:'', due_date:'', item_sold:'', currency_code:'INR' }]);
+      setEditInvoices([{ invoice_number:'', invoice_amount:'', unpaid_amount:'', invoice_date:'', due_date:'', item_sold:'', currency_code:'INR' }]);
     }
     setEditContacts(cps.map(c => ({
       id: c.id,
@@ -171,7 +171,7 @@ export default function IncidentDetailPage(): JSX.Element {
   // Re-init invoices after state set in startEdit
   useEffect(() => {
     if (editing && editInvoices.length === 0) {
-      setEditInvoices([{ invoice_amount:'', unpaid_amount:'', invoice_date:'', due_date:'', item_sold:'', currency_code:'INR' }]);
+      setEditInvoices([{ invoice_number:'', invoice_amount:'', unpaid_amount:'', invoice_date:'', due_date:'', item_sold:'', currency_code:'INR' }]);
     }
   }, [editing]);
 
@@ -586,7 +586,7 @@ export default function IncidentDetailPage(): JSX.Element {
             </div>
           </div>
         ))}
-        <button type="button" onClick={() => setEditInvoices(p => [...p, { invoice_amount:'', unpaid_amount:'', invoice_date:'', due_date:'', item_sold:'', currency_code: editIncident.currency_code }])}
+        <button type="button" onClick={() => setEditInvoices(p => [...p, { invoice_number:'', invoice_amount:'', unpaid_amount:'', invoice_date:'', due_date:'', item_sold:'', currency_code: editIncident.currency_code }])}
           className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors mt-1">
           <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 font-bold text-base">+</span>
           Add invoice
