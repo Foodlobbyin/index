@@ -69,9 +69,9 @@ router.post('/', async (c) => {
         for (const inv of new_invoices) {
           if (!inv.invoice_amount && !inv.unpaid_amount) continue;
           await db.query(
-            `INSERT INTO incident_invoices (incident_id, invoice_amount, unpaid_amount, invoice_date, due_date, item_sold, currency_code)
-             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-            [incident_id, inv.invoice_amount || null, inv.unpaid_amount || null,
+            `INSERT INTO incident_invoices (incident_id, invoice_number, invoice_amount, unpaid_amount, invoice_date, due_date, item_sold, currency_code)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+            [incident_id, inv.invoice_number?.trim() || null, inv.invoice_amount || null, inv.unpaid_amount || null,
              inv.invoice_date || null, inv.due_date || null, inv.item_sold || null,
              inv.currency_code || new_data.currency_code || 'INR']
           );
@@ -258,7 +258,7 @@ router.put('/:id/approve', requireMinTrustLevel('moderator'), async (c) => {
       await db.query(
         `INSERT INTO incident_invoices (incident_id, invoice_amount, unpaid_amount, invoice_date, due_date, item_sold, currency_code)
          VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [edit.incident_id, inv.invoice_amount || null, inv.unpaid_amount || null,
+        [edit.incident_id, inv.invoice_number?.trim() || null, inv.invoice_amount || null, inv.unpaid_amount || null,
          inv.invoice_date || null, inv.due_date || null, inv.item_sold || null,
          inv.currency_code || edit.new_currency_code || 'INR']
       );
