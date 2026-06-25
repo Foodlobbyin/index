@@ -24,6 +24,7 @@ const INDIAN_STATES = [
 
 interface InvoiceRow {
   id?: number;
+  invoice_number: string;
   invoice_amount: string;
   unpaid_amount: string;
   invoice_date: string;
@@ -144,6 +145,7 @@ export default function IncidentDetailPage(): JSX.Element {
     });
     setEditInvoices(invs.map(i => ({
       id: i.id,
+      invoice_number: i.invoice_number ?? '',
       invoice_amount: i.invoice_amount?.toString() ?? '',
       unpaid_amount: i.unpaid_amount?.toString() ?? '',
       invoice_date: i.invoice_date ? i.invoice_date.split('T')[0] : '',
@@ -231,6 +233,7 @@ export default function IncidentDetailPage(): JSX.Element {
       const validInvoices = editInvoices
         .filter(i => i.invoice_amount.trim() || i.unpaid_amount.trim())
         .map(i => ({
+          invoice_number: i.invoice_number?.trim() || null,
           invoice_amount: i.invoice_amount ? parseFloat(i.invoice_amount) : null,
           unpaid_amount: i.unpaid_amount ? parseFloat(i.unpaid_amount) : null,
           invoice_date: i.invoice_date || null,
@@ -388,7 +391,7 @@ export default function IncidentDetailPage(): JSX.Element {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="bg-gray-50 text-left">
-                {['#','Invoice Date','Due Date','Invoice Amount','Unpaid Amount','Item / Product'].map(col => (
+                {['#','Invoice No.','Invoice Date','Due Date','Invoice Amount','Unpaid Amount','Item / Product'].map(col => (
                   <th key={col} className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{col}</th>
                 ))}
               </tr></thead>
@@ -396,6 +399,7 @@ export default function IncidentDetailPage(): JSX.Element {
                 {incidentInvoices.map((inv: any, idx: number) => (
                   <tr key={inv.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-gray-400 text-xs">{idx+1}</td>
+                    <td className="px-4 py-3 font-mono text-gray-700 text-xs whitespace-nowrap">{inv.invoice_number || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{fmt(inv.invoice_date)}</td>
                     <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{fmt(inv.due_date)}</td>
                     <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{fmtAmt(inv.invoice_amount, inv.currency_code)}</td>
@@ -559,6 +563,11 @@ export default function IncidentDetailPage(): JSX.Element {
               )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div><label className={lbl}>Invoice / Bill No.</label>
+                <input type="text" className={inp} placeholder="e.g. INV-2024-001"
+                  value={inv.invoice_number}
+                  onChange={e => { const u=[...editInvoices]; u[idx]={...u[idx],invoice_number:e.target.value}; setEditInvoices(u); }}
+                /></div>
               <div><label className={lbl}>Invoice Amount (₹) <span className="text-red-500">*</span></label>
                 <input type="number" className={inp} value={inv.invoice_amount} min="0" step="0.01"
                   onChange={e => setEditInvoices(p => { const u=[...p]; u[idx]={...u[idx],invoice_amount:e.target.value}; return u; })} /></div>
