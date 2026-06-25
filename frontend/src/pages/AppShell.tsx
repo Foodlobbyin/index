@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, Navigate, NavLink, Routes, Route, useLocation } from 'react-router-dom';
 import { Search, MessageSquare, LogOut, User, ClipboardList, Shield, FileText, Settings, KeyRound, BookOpen, BarChart2, Newspaper } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,33 +22,17 @@ const AUDIT_LOG_TRUST_LEVELS: ReadonlyArray<'moderator' | 'admin'> = ['moderator
 const AppShell: React.FC = () => {
   const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [hasIncidentAgainstUser, setHasIncidentAgainstUser] = useState(false);
   const location = useLocation();
 
   const canAccessAuditLogs = !!user?.trust_level && AUDIT_LOG_TRUST_LEVELS.includes(user.trust_level);
   const isModerator = canAccessAuditLogs;
   const isAdmin = user?.trust_level === 'admin';
 
-  // Check if any approved/resolved incident has been filed against the user's company.
-  // "My Defaults" is only shown when the user has skin in the game (someone reported them).
-  useEffect(() => {
-    if (!user) return;
-    const check = async () => {
-      try {
-        const { default: api } = await import('../services/api');
-        const res = await api.get('/incidents/against-my-company');
-        const data = res.data;
-        // Endpoint returns { count: N } or an array
-        const count = Array.isArray(data) ? data.length : (data?.count ?? data?.total ?? 0);
-        setHasIncidentAgainstUser(count > 0);
-      } catch {
-        // If endpoint doesn't exist yet, fall back to showing for admin/moderator only
-        setHasIncidentAgainstUser(isAdmin || isModerator);
-      }
-    };
-    check();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  // "My Defaults" is visible when the backend confirmed (via the user profile JOIN)
+  // that at least one incident exists against this user's company GSTN.
+  // The has_incidents flag is returned by GET /api/auth/profile (findById JOIN companies)
+  // so no extra API call is needed here.
+  const hasIncidentAgainstUser: boolean = !!(user?.has_incidents) || isAdmin;
 
   const tabs = [
     { id: 'search', label: 'Search', icon: <Search size={18} /> },
