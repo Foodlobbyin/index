@@ -20,6 +20,7 @@ import contactRoutes from './routes/contact.routes';
 import healthRoutes from './routes/health';
 import pendingEditsRouter from './routes/pendingEdits.routes';
 import forumRoutes from './routes/forum.routes';
+import profileRoutes from './routes/profile.routes';
 import { apiLimiter } from './middleware/rateLimiter';
 
 const app = new Hono<AppBindings>();
@@ -177,6 +178,7 @@ app.route('/api/audit-logs', auditLogRoutes);
 app.route('/api/admin', adminRoutes);
 app.route('/api/pending-edits', pendingEditsRouter);
 app.route('/api/forum', forumRoutes);
+app.route('/api/profile', profileRoutes);
 
 // 404 handler
 app.notFound((c) => {
