@@ -140,7 +140,7 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               <h3 className="text-lg font-semibold mb-3">Contact</h3>
               <ul className="space-y-2 text-sm">
                 <li className="text-gray-400">Email: support@foodlobby.in</li>
-                <li className="text-gray-400">Junagadh, Gujarat, India</li>
+                <li className="text-gray-400">Mumbai, Maharashtra, India</li>
               </ul>
             </div>
           </div>
