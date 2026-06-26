@@ -16,6 +16,7 @@ import MyDefaultsPage from './MyDefaultsPage';
 import InvoiceCreatePage from './InvoiceCreatePage';
 import InvoiceDetailPage from './InvoiceDetailPage';
 import InvoiceEditPage from './InvoiceEditPage';
+import UserSettingsPage from './UserSettingsPage';
 
 const AUDIT_LOG_TRUST_LEVELS: ReadonlyArray<'moderator' | 'admin'> = ['moderator', 'admin'];
 
@@ -163,6 +164,15 @@ const AppShell: React.FC = () => {
                           My Profile
                         </a>
                       )}
+                      <Link
+                        to="/app/settings"
+                        onClick={() => setShowUserMenu(false)}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                        style={{ display: 'flex', textDecoration: 'none' }}
+                      >
+                        <Settings size={16} className="mr-2" />
+                        Account Settings
+                      </Link>
                       <button
                         onClick={handleLogout}
                         className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center"
@@ -191,17 +201,7 @@ const AppShell: React.FC = () => {
                   <>
                     {activeTab === 'search' && <SearchSubmitSection />}
                     {activeTab === 'stats' && <DashboardKPIs />}
-                    {activeTab === 'forum' && (
-                      // FORUM_COMING_SOON — replace this block with <ForumSection /> when ready to go live
-                      <div className="flex flex-col items-center justify-center py-24 text-center">
-                        <div className="text-5xl mb-4">🏗️</div>
-                        <h2 className="text-2xl font-bold text-gray-800 mb-2">Industry Forum</h2>
-                        <p className="text-gray-500 text-base max-w-md">
-                          Coming Soon — a dedicated space for commodity professionals to discuss trade, share insights, and stay ahead.
-                        </p>
-                      </div>
-                      // END FORUM_COMING_SOON
-                    )}
+                    {activeTab === 'forum' && <ForumSection />}
                     {activeTab === 'insider' && <InsiderSection />}
                     {activeTab === 'activitylog' && (
                       canAccessAuditLogs ? <AuditLogPage /> : <Navigate to="/app" replace />
@@ -236,6 +236,8 @@ const AppShell: React.FC = () => {
               isModerator ? <ModerationQueuePage /> : <Navigate to="/app" replace />
             }
           />
+          {/* User Settings */}
+          <Route path="settings" element={<UserSettingsPage />} />
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/app" replace />} />
         </Routes>

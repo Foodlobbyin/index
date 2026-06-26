@@ -1,131 +1,161 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { forumService } from '../../services/forumService';
+import { forumService, CATEGORIES, TrustLevel, ForumCategory } from '../../services/forumService';
 import Button from '../ui/Button';
-import Input from '../ui/Input';
 
-interface CreateTopicModalProps {
+const TRUST_LABEL: Record<TrustLevel, string> = {
+  basic: 'All members (Basic+)',
+  verified: 'Verified members and above',
+  trusted: 'Trusted members and above',
+  moderator: 'Moderators and above',
+  admin: 'Admin only',
+};
+
+interface Props {
+  trustOptions: TrustLevel[];
   onClose: () => void;
   onSuccess: () => void;
 }
 
-const CreateTopicModal: React.FC<CreateTopicModalProps> = ({ onClose, onSuccess }) => {
-  const [formData, setFormData] = useState({
-    title: '',
-    category: '',
-    content: '',
-  });
+const CreateTopicModal: React.FC<Props> = ({ trustOptions, onClose, onSuccess }) => {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [category, setCategory] = useState<ForumCategory>(CATEGORIES[4]); // General Discussion default
+  const [minTrust, setMinTrust] = useState<TrustLevel>(trustOptions[0] ?? 'basic');
+  const [isAnon, setIsAnon] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  const categories = forumService.getCategories();
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-
-    if (!formData.title.trim() || !formData.category || !formData.content.trim()) {
-      setError('Please fill in all fields');
-      return;
-    }
-
+    if (!title.trim() || !content.trim()) return;
     setSubmitting(true);
+    setError(null);
     try {
-      await forumService.createTopic(formData);
+      await forumService.createPost({
+        title: title.trim(),
+        content: content.trim(),
+        category,
+        min_trust_level: minTrust,
+        is_anonymous: isAnon,
+      });
       onSuccess();
-    } catch (error) {
-      console.error('Error creating topic:', error);
-      setError('Failed to create topic. Please try again.');
+    } catch (err: any) {
+      setError(err?.response?.data?.error ?? 'Failed to create post');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-40"
-        onClick={onClose}
-      />
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">New Post</h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-      {/* Modal */}
-      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
-            <h2 className="text-2xl font-bold">Create New Topic</h2>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <X size={20} />
-            </button>
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              maxLength={200}
+              required
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="What's your topic?"
+            />
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                {error}
-              </div>
-            )}
+          {/* Category */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as ForumCategory)}
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
 
-            <Input
-              type="text"
-              label="Topic Title"
-              placeholder="Enter a descriptive title"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          {/* Content */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={5}
               required
-              fullWidth
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Share your experience, question, or insight…"
             />
+          </div>
 
+          {/* Visibility (only shown if user has more than one option) */}
+          {trustOptions.length > 1 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category
+                Visible to
               </label>
               <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
+                value={minTrust}
+                onChange={(e) => setMinTrust(e.target.value as TrustLevel)}
+                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Select a category</option>
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
+                {trustOptions.map((level) => (
+                  <option key={level} value={level}>
+                    {TRUST_LABEL[level]}
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-gray-400 mt-1">
+                All members at or above the selected level will see this post.
+              </p>
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Content
-              </label>
-              <textarea
-                value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                rows={6}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Describe your topic, question, or concern..."
-                required
-              />
-            </div>
+          {/* Anonymous */}
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isAnon}
+              onChange={(e) => setIsAnon(e.target.checked)}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            Post anonymously (uses your anonymous handle)
+          </label>
 
-            <div className="flex gap-3 justify-end pt-4">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" isLoading={submitting}>
-                Create Topic
-              </Button>
-            </div>
-          </form>
-        </div>
+          {/* Actions */}
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" isLoading={submitting} disabled={!title.trim() || !content.trim()}>
+              Post
+            </Button>
+          </div>
+        </form>
       </div>
-    </>
+    </div>
   );
 };
 
