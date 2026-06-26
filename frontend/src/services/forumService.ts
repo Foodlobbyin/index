@@ -67,6 +67,28 @@ export interface VoteResult {
   my_vote: VoteType;
 }
 
+export interface Announcement {
+  id: number;
+  title: string;
+  content: string;
+  posted_at: string;
+  author: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateAnnouncementInput {
+  title: string;
+  content: string;
+  posted_at?: string; // ISO string — optional, defaults to now
+}
+
+export interface UpdateAnnouncementInput {
+  title?: string;
+  content?: string;
+  posted_at?: string;
+}
+
 // ── Service ──────────────────────────────────────────────────────────────────
 
 export const forumService = {
@@ -121,5 +143,30 @@ export const forumService = {
   async setAnonHandle(handle: string): Promise<{ forum_anon_handle: string }> {
     const res = await api.put('/forum/anon-handle', { handle });
     return res.data;
+  },
+
+  // ── Announcements ────────────────────────────────────────
+
+  /** Get all announcements (all authenticated users). */
+  async getAnnouncements(): Promise<Announcement[]> {
+    const res = await api.get('/forum/announcements');
+    return res.data.announcements;
+  },
+
+  /** Create a new announcement entry (admin only). */
+  async createAnnouncement(input: CreateAnnouncementInput): Promise<Announcement> {
+    const res = await api.post('/forum/announcements', input);
+    return res.data;
+  },
+
+  /** Update an announcement entry (admin only). */
+  async updateAnnouncement(id: number, input: UpdateAnnouncementInput): Promise<Announcement> {
+    const res = await api.put(`/forum/announcements/${id}`, input);
+    return res.data;
+  },
+
+  /** Delete an announcement entry (admin only). */
+  async deleteAnnouncement(id: number): Promise<void> {
+    await api.delete(`/forum/announcements/${id}`);
   },
 };

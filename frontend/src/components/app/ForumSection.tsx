@@ -5,6 +5,7 @@ import Button from '../ui/Button';
 import ForumTopicList from './ForumTopicList';
 import ForumTopicDetail from './ForumTopicDetail';
 import CreateTopicModal from './CreateTopicModal';
+import AnnouncementsPanel from './AnnouncementsPanel';
 
 const ForumSection: React.FC = () => {
   const [posts, setPosts] = useState<ForumPost[]>([]);
@@ -83,6 +84,9 @@ const ForumSection: React.FC = () => {
           </button>
         )}
       </div>
+
+      {/* Announcements timeline — pinned above post list */}
+      <AnnouncementsPanel />
 
       {/* Error */}
       {error && (
