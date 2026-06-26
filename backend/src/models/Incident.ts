@@ -50,6 +50,11 @@ export interface Incident {
 export interface IncidentCreateInput {
   company_gstn?: string;
   company_name: string;
+  // Company address fields — saved to companies table
+  state?: string;
+  pincode?: string;
+  street_address?: string;
+  msme_udyam_number?: string;
   incident_type: IncidentType;
   incident_date: Date | string;
   incident_title: string;
@@ -61,6 +66,8 @@ export interface IncidentCreateInput {
   reporter_name?: string;
   reporter_email?: string;
   reporter_phone?: string;
+  invoices?: unknown[];
+  contact_persons?: unknown[];
 }
 
 export interface IncidentUpdateInput {
