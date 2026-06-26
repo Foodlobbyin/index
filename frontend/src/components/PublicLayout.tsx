@@ -44,7 +44,7 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               >
                 Alerts & Updates
               </Link>
-              */
+              */}
               <Link to="/login">
                 <Button className="bg-green-700 hover:bg-green-800 text-white">
                   Member Sign In
@@ -83,7 +83,7 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               >
                 Alerts & Updates
               </Link>
-              */
+              */}
               <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
                 <Button fullWidth className="bg-green-700 hover:bg-green-800 text-white">
                   Member Sign In
@@ -128,7 +128,7 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
                     Alerts &amp; Updates
                   </Link>
                 </li>
-                */
+                */}
                 <li>
                   <Link to="/login" className="text-gray-400 hover:text-white transition-colors">
                     Member Sign In
