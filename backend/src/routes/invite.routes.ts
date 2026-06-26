@@ -69,7 +69,7 @@ router.post('/generate', authenticate, requireMinTrustLevel('admin'), async (c) 
 router.post('/send', authenticate, async (c) => {
   const db = createDbClient(c.env.DATABASE_URL);
   const user = c.get('user') as any;
-  const { email } = await c.req.json();
+  const { email, company_name } = await c.req.json();
 
   if (!email) return c.json({ error: 'Email is required' }, 400);
 
@@ -96,9 +96,10 @@ router.post('/send', authenticate, async (c) => {
 
   const inviteUrl = `${c.env.FRONTEND_URL}/register?invite=${invite.token}`;
   const senderName = userRow.rows[0]?.first_name || userRow.rows[0]?.username;
+  const recipientCompany: string | null = (company_name ?? '').trim() || null;
 
   try {
-    await sendInviteEmail(c.env.RESEND_API_KEY, c.env.EMAIL_FROM, email, inviteUrl, 'member', senderName);
+    await sendInviteEmail(c.env.RESEND_API_KEY, c.env.EMAIL_FROM, email, inviteUrl, 'member', senderName, recipientCompany);
   } catch (err) {
     console.error('Failed to send invite email:', err);
   }
@@ -149,7 +150,8 @@ async function sendInviteEmail(
   toEmail: string,
   inviteUrl: string,
   type: 'marketing' | 'member',
-  senderName: string | null
+  senderName: string | null,
+  recipientCompany: string | null = null
 ) {
   const subject = type === 'marketing'
     ? 'You are invited to join Foodlobby'
@@ -165,6 +167,7 @@ async function sendInviteEmail(
         ${type === 'member'
           ? `<p style="font-size:15px;color:#374151">You have been personally invited by <strong>${senderName}</strong> to join Foodlobby.</p>`
           : `<p style="font-size:15px;color:#374151">You have been personally selected by the Foodlobby team to join our platform.</p>`}
+        ${recipientCompany ? `<p style="font-size:13px;color:#6b7280;margin:0 0 16px">Addressed to: <strong>${recipientCompany}</strong></p>` : ''}
         <p style="font-size:15px;color:#374151;line-height:1.65">
           <strong>Foodlobby</strong> is a community-driven platform that helps food &amp; spice commodity
           professionals protect themselves from <strong>trade fraud, credit defaults, and payment scams</strong> in India.
