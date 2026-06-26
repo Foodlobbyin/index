@@ -16,7 +16,7 @@ const UserSettingsPage: React.FC = () => {
 
   useEffect(() => {
     // Load current anon handle from profile
-    api.get('/api/secure-auth/profile')
+    api.get('/secure-auth/profile')
       .then((res) => {
         const h = res.data?.user?.forum_anon_handle ?? res.data?.forum_anon_handle ?? null;
         setCurrentHandle(h);
@@ -24,7 +24,7 @@ const UserSettingsPage: React.FC = () => {
       })
       .catch(() => {
         // Try auth/profile fallback
-        api.get('/api/auth/profile')
+        api.get('/auth/profile')
           .then((res) => {
             const h = res.data?.user?.forum_anon_handle ?? res.data?.forum_anon_handle ?? null;
             setCurrentHandle(h);
