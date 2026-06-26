@@ -17,6 +17,12 @@ export class IncidentController {
       };
       const incident = await incidentService.createIncident(db, data);
 
+      // Auto-submit for moderation immediately — no manual "Submit for Review" step needed
+      let finalIncident = incident;
+      try {
+        finalIncident = await incidentService.submitIncident(db, incident.id, user?.id);
+      } catch { /* if auto-submit fails, incident remains as draft — non-fatal */ }
+
       try {
         await auditLogService.writeLog(db, {
           user_id: user?.id,
@@ -27,13 +33,14 @@ export class IncidentController {
             incident_id: incident.id,
             company_gstn: incident.company_gstn,
             is_anonymous: incident.is_anonymous,
+            auto_submitted: finalIncident.status === 'submitted',
           },
           ip_address:
             c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown',
         });
       } catch { /* audit log failure must not break the main action */ }
 
-      return c.json({ message: 'Incident submitted successfully', incident }, 201);
+      return c.json({ message: 'Incident submitted successfully', incident: finalIncident }, 201);
     } catch (error: any) {
       return c.json({ error: error.message }, 400);
     }

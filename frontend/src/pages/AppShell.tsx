@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, Navigate, NavLink, Routes, Route, useLocation } from 'react-router-dom';
 import { Search, MessageSquare, LogOut, User, ClipboardList, Shield, FileText, Settings, KeyRound, BookOpen, BarChart2, Newspaper } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,6 +28,25 @@ const AppShell: React.FC = () => {
   const canAccessAuditLogs = !!user?.trust_level && AUDIT_LOG_TRUST_LEVELS.includes(user.trust_level);
   const isModerator = canAccessAuditLogs;
   const isAdmin = user?.trust_level === 'admin';
+
+  // Pending moderation count — shown as badge on Moderation nav link
+  const [moderationCount, setModerationCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (!isModerator) return;
+    const fetchModerationCount = async () => {
+      try {
+        const { default: api } = await import('../services/api');
+        const res = await api.get('/moderation/queue');
+        const incidents: any[] = res.data.incidents ?? [];
+        const pendingEdits: any[] = res.data.pending_edits ?? [];
+        setModerationCount(incidents.length + pendingEdits.length);
+      } catch {
+        // non-critical — badge simply won't show on error
+      }
+    };
+    fetchModerationCount();
+  }, [isModerator]);
 
   // "My Defaults" is visible when the backend confirmed (via the user profile JOIN)
   // that at least one incident exists against this user's company GSTN.
@@ -92,6 +111,11 @@ const AppShell: React.FC = () => {
                 <NavLink to="/app/moderation" className={navLinkClass}>
                   <Shield size={16} />
                   <span>Moderation</span>
+                  {moderationCount > 0 && (
+                    <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
+                      {moderationCount > 99 ? '99+' : moderationCount}
+                    </span>
+                  )}
                 </NavLink>
               )}
               {(hasIncidentAgainstUser || isAdmin) && (
