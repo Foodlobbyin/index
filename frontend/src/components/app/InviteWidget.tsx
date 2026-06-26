@@ -110,7 +110,7 @@ const InviteWidget: React.FC = () => {
                   lineHeight: 1.4,
                 }}
               >
-                Know someone in the food & spice trade?
+                Know someone from Food Processing & Spices Trade Industry?
               </p>
               <p
                 style={{
@@ -120,7 +120,7 @@ const InviteWidget: React.FC = () => {
                   lineHeight: 1.5,
                 }}
               >
-                If you find FoodLobby valuable, invite a trusted colleague.
+                If you find FoodLobby valuable, nominate them as an Industry Member.
                 A stronger network protects everyone in the trade.
               </p>
             </div>
@@ -143,7 +143,7 @@ const InviteWidget: React.FC = () => {
             }}
           >
             <UserPlus size={15} />
-            Invite a Colleague
+            Invite an Industry Member
           </button>
         </div>
       )}
@@ -190,10 +190,10 @@ const InviteWidget: React.FC = () => {
                     color: '#111827',
                   }}
                 >
-                  Invite a Colleague
+                  Invite an Industry Member
                 </p>
                 <p style={{ margin: '2px 0 0', fontSize: 12, color: '#6b7280' }}>
-                  They will receive a personal, single-use invite link by email.
+                  They will receive a personal, single-use invite link by email valid for 30 days.
                 </p>
               </div>
             </div>
@@ -369,7 +369,7 @@ const InviteWidget: React.FC = () => {
               }}
             >
               <Send size={14} />
-              {loading ? 'Sending…' : 'Send Invite'}
+              {loading ? 'Sending…' : 'Send Invitation'}
             </button>
           </div>
         </div>
