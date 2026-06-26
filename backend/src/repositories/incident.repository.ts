@@ -44,15 +44,16 @@ export class IncidentRepository {
       );
       if (existing.rows[0]) {
         companyId = existing.rows[0].id;
-        // Update any missing fields (state, pincode, etc.) while we have them
+        // Update company fields — always write user-submitted values;
+        // fall back to existing DB value only when the user sent nothing.
         await db.query(
           `UPDATE companies SET
-             company_name   = COALESCE(NULLIF(company_name,''), $2),
-             state          = COALESCE(state, $3),
-             pincode        = COALESCE(pincode, $4),
-             street_address = COALESCE(street_address, $5),
-             msme_udyam_number = COALESCE(msme_udyam_number, $6),
-             updated_at     = NOW()
+             company_name      = COALESCE(NULLIF($2,''), company_name),
+             state             = COALESCE($3, state),
+             pincode           = COALESCE($4, pincode),
+             street_address    = COALESCE($5, street_address),
+             msme_udyam_number = COALESCE($6, msme_udyam_number),
+             updated_at        = NOW()
            WHERE id = $1`,
           [companyId, company_name || null, state || null, pincode || null,
            street_address || null, msme_udyam_number || null]
@@ -63,12 +64,12 @@ export class IncidentRepository {
           `INSERT INTO companies (gstn, company_name, state, pincode, street_address, msme_udyam_number, is_registered_member)
            VALUES ($1, $2, $3, $4, $5, $6, FALSE)
            ON CONFLICT (gstn) DO UPDATE SET
-             company_name   = EXCLUDED.company_name,
-             state          = COALESCE(companies.state, EXCLUDED.state),
-             pincode        = COALESCE(companies.pincode, EXCLUDED.pincode),
-             street_address = COALESCE(companies.street_address, EXCLUDED.street_address),
-             msme_udyam_number = COALESCE(companies.msme_udyam_number, EXCLUDED.msme_udyam_number),
-             updated_at     = NOW()
+             company_name      = COALESCE(NULLIF(EXCLUDED.company_name,''), companies.company_name),
+             state             = COALESCE(EXCLUDED.state, companies.state),
+             pincode           = COALESCE(EXCLUDED.pincode, companies.pincode),
+             street_address    = COALESCE(EXCLUDED.street_address, companies.street_address),
+             msme_udyam_number = COALESCE(EXCLUDED.msme_udyam_number, companies.msme_udyam_number),
+             updated_at        = NOW()
            RETURNING id`,
           [normalGstn, company_name, state || null, pincode || null,
            street_address || null, msme_udyam_number || null]
